@@ -23,8 +23,8 @@ ARG IMAGING_X_API_KEY=N/A
 ARG IMAGING_MCP_URL=http://172.31.237.125:8282/mcp
 
 # Replace placeholders in config file with actual values
-RUN sed -i "s/<your Imaging API key here>/${IMAGING_X_API_KEY}/g" /app/config/default_with_mcp.yaml && \
-    sed -i "s|<your Imaging MCP URL here>|${IMAGING_MCP_URL}|g" /app/config/default_with_mcp.yaml
+RUN sed -i "s/<your Imaging API key here>/${IMAGING_X_API_KEY}/g" /app/config/advanced_engineering_with_mcp.yaml && \
+    sed -i "s|<your Imaging MCP URL here>|${IMAGING_MCP_URL}|g" /app/config/advanced_engineering_with_mcp.yaml
 
 # Install Python dependencies
 RUN pip install -e '.'

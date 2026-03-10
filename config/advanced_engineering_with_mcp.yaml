@@ -77,6 +77,8 @@ agent:
       - path: tools/edit_anthropic
       - path: tools/review_on_submit_m
       - path: tools/mcp_client
+      - path: tools/search
+      - path: tools/windowed_edit_linting
     registry_variables:
       USE_FILEMAP: 'true'
       MCP_CONFIG:

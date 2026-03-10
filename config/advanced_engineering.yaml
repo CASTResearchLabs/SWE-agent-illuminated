@@ -1,0 +1,137 @@
+# Advanced SWE-agent for Sophisticated Software Engineering
+# Traditional approach using code analysis tools and best practices
+agent:
+  templates:
+    system_template: |-
+      You are an expert software engineering assistant capable of sophisticated code analysis, architecture assessment, and complex refactoring tasks. You excel at understanding large codebases, identifying patterns, and implementing robust solutions that follow software engineering best practices.
+    instance_template: |-
+      <uploaded_files>
+      {{working_dir}}
+      </uploaded_files>
+      I'm working on a sophisticated software engineering task in the directory {{working_dir}}. Here's the requirement:
+
+      <task_description>
+      {{problem_statement}}
+      </task_description>
+
+      Approach this systematically using advanced software engineering practices:
+
+      **PHASE 1: Codebase Discovery & Analysis**
+      1. Thoroughly explore the codebase structure using file searches and semantic analysis
+      2. Identify key architectural patterns, frameworks, and technologies in use
+      3. Map out major components, modules, and their relationships
+      4. Locate configuration files, build scripts, and documentation
+      5. Understand the testing strategy and existing test coverage
+      6. Identify API endpoints, data models, and core business logic
+
+      **PHASE 2: Impact Analysis & Planning**
+      7. Use semantic search to find all code related to your task
+      8. Trace dependencies and identify potential ripple effects
+      9. Analyze calling patterns and usage across the codebase
+      10. Consider backwards compatibility and migration strategies
+      11. Plan your approach to minimize breaking changes
+      12. Identify areas requiring additional test coverage
+
+      **PHASE 3: Implementation with Engineering Excellence**
+      13. Follow established patterns and conventions in the codebase
+      14. Implement changes incrementally with proper error handling
+      15. Maintain code quality standards (readability, maintainability, performance)
+      16. Consider edge cases, security implications, and scalability
+      17. Ensure proper logging, monitoring, and observability
+      18. Document significant design decisions and trade-offs
+
+      **PHASE 4: Validation & Quality Assurance**
+      19. Create comprehensive test coverage for new functionality
+      20. Verify existing tests still pass and update as needed
+      21. Test edge cases and error conditions thoroughly
+      22. Consider integration testing and end-to-end scenarios
+      23. Review code for potential security vulnerabilities
+      24. Ensure performance characteristics meet requirements
+
+      **Advanced Engineering Techniques to Apply:**
+      - **Semantic Code Search**: Use sophisticated search patterns to understand code relationships
+      - **Dependency Analysis**: Map out how components interact and depend on each other
+      - **Pattern Recognition**: Identify and follow established architectural patterns
+      - **Refactoring Strategies**: Apply safe refactoring techniques (extract method, move class, etc.)
+      - **Design Principles**: Follow SOLID principles, DRY, KISS, and other best practices
+      - **Error Handling**: Implement robust error handling and recovery mechanisms
+      - **Performance Optimization**: Consider algorithmic complexity and resource utilization
+      - **Security Best Practices**: Apply secure coding practices and threat modeling
+      - **Testing Strategies**: Use unit, integration, and end-to-end testing appropriately
+      - **Documentation**: Maintain clear, comprehensive documentation for complex logic
+
+      **Common Software Engineering Tasks:**
+      - **API Design & Implementation**: RESTful services, GraphQL, microservices
+      - **Database Design & Optimization**: Schema design, query optimization, migrations  
+      - **Architecture Refactoring**: Monolith decomposition, service extraction
+      - **Performance Optimization**: Profiling, caching strategies, algorithmic improvements
+      - **Security Hardening**: Authentication, authorization, input validation
+      - **CI/CD Pipeline Enhancement**: Build optimization, testing automation
+      - **Legacy Code Modernization**: Framework upgrades, dependency management
+      - **Scalability Improvements**: Load balancing, horizontal scaling, caching
+
+      Focus on delivering production-ready, maintainable code that follows industry best practices and integrates seamlessly with the existing codebase architecture.
+    next_step_template: |-
+      OBSERVATION:
+      {{observation}}
+      
+      Continue with your systematic engineering approach, applying software engineering best practices to your next steps.
+    next_step_no_output_template: |-
+      Your command ran successfully and did not produce any output. Continue with thorough analysis and systematic implementation.
+  tools:
+    env_variables:
+      PAGER: cat
+      MANPAGER: cat
+      LESS: -R
+      PIP_PROGRESS_BAR: 'off'
+      TQDM_DISABLE: '1'
+      GIT_PAGER: cat
+    propagate_env_variables:
+      - "OPENAI_API_KEY"
+      - "GEMINI_API_KEY"
+    bundles:
+      - path: tools/registry
+      - path: tools/edit_anthropic
+      - path: tools/review_on_submit_m
+      - path: tools/search
+      - path: tools/windowed_edit_linting
+    registry_variables:
+      USE_FILEMAP: 'true'
+      SUBMIT_REVIEW_MESSAGES:
+        - |
+          Excellent work on this sophisticated software engineering implementation. Your solution demonstrates advanced engineering practices and systematic thinking.
+
+          **Final Engineering Review Checklist:**
+
+          1. **Architecture Compliance**: Verify your changes follow the established architectural patterns and don't introduce anti-patterns or violations.
+
+          2. **Code Quality**: Ensure your implementation meets coding standards including readability, maintainability, performance, and security considerations.
+
+          3. **Testing Coverage**: Confirm comprehensive test coverage for new functionality and verify existing tests still pass.
+
+          4. **Integration Testing**: Validate that your changes work correctly with the broader system and don't introduce regressions.
+
+          5. **Documentation**: Ensure complex logic is properly documented and any API changes are reflected in documentation.
+
+          6. **Performance Impact**: Verify that changes don't negatively impact system performance or introduce bottlenecks.
+
+          7. **Security Review**: Check that your implementation follows secure coding practices and doesn't introduce vulnerabilities.
+
+          8. **Error Handling**: Confirm robust error handling and graceful degradation under failure conditions.
+
+          9. **Backwards Compatibility**: Ensure changes maintain backwards compatibility or provide appropriate migration strategies.
+
+          10. **Cleanup**: Remove any temporary files, debug code, or development artifacts.
+
+          **Engineering Implementation Summary:**
+          <diff>
+          {{diff}}
+          </diff>
+
+          Your systematic approach and attention to software engineering principles demonstrates professional development practices that will lead to maintainable, robust, and scalable solutions.
+    enable_bash_tool: true
+    parse_function:
+      type: function_calling
+  history_processors:
+    - type: cache_control
+      last_n_messages: 2
