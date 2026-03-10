@@ -12,6 +12,9 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY:-N/A}
       - IMAGING_X_API_KEY=${IMAGING_X_API_KEY:-N/A}
       - IMAGING_MCP_URL=${IMAGING_MCP_URL:-http://172.31.237.125:8282/mcp}
+    volumes:
+      - ./trajectories:/app/trajectories
+      - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /app
     stdin_open: true
     tty: true
