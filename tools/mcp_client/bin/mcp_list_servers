@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+
+import sys
+from pathlib import Path
+
+# Add lib directory to path
+lib_path = str(Path(__file__).resolve().parent.parent / "lib")
+sys.path.insert(0, lib_path)
+
+from mcp_client import list_available_servers
+from registry import registry
+
+
+def main():
+    try:
+        # Get current default server
+        default_server = registry.get("MCP_DEFAULT_SERVER", "default")
+        
+        # List all configured servers
+        servers = list_available_servers()
+        
+        if not servers:
+            print("No MCP servers configured.")
+            print("Use 'mcp_add_server' to add a server.")
+            return
+            
+        print("Configured MCP Servers:")
+        print("=" * 50)
+        
+        for name, config in servers.items():
+            marker = " (DEFAULT)" if name == default_server else ""
+            print(f"  {name}{marker}")
+            print(f"    URL: {config.get('httpUrl', 'N/A')}")
+            print(f"    Timeout: {config.get('timeout', 30000)}ms")
+            print(f"    Trust: {config.get('trust', True)}")
+            
+            headers = config.get('headers', {})
+            if headers:
+                print(f"    Headers: {len(headers)} custom headers")
+                for key in headers.keys():
+                    if 'key' in key.lower() or 'token' in key.lower():
+                        print(f"      {key}: [REDACTED]")
+                    else:
+                        print(f"      {key}: {headers[key]}")
+            print()
+            
+    except Exception as e:
+        print(f"Error listing servers: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

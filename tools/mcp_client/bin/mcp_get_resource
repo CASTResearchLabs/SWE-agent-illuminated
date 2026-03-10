@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+
+import sys
+from pathlib import Path
+from argparse import ArgumentParser
+
+# Add lib directory to path
+lib_path = str(Path(__file__).resolve().parent.parent / "lib")
+sys.path.insert(0, lib_path)
+
+from mcp_client import get_mcp_client, format_mcp_response, MCPError
+
+
+def main():
+    parser = ArgumentParser(description="Get a resource from MCP server")
+    parser.add_argument("resource_uri", help="URI of the resource to retrieve")
+    parser.add_argument("server_name", nargs="?", help="Name of MCP server (defaults to default server)")
+    args = parser.parse_args()
+    
+    try:
+        with get_mcp_client(server_name=args.server_name) as client:
+            if not client.ping():
+                server_name = args.server_name or "default"
+                print(f"Error: Cannot reach MCP server '{server_name}' at {client.base_url}")
+                sys.exit(1)
+            
+            # Get the resource
+            response = client.get_resource(args.resource_uri)
+            output = format_mcp_response(response)
+            print(output)
+            
+    except MCPError as e:
+        print(f"MCP Error: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

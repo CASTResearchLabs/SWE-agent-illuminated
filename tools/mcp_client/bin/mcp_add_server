@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+
+import sys
+import json
+from pathlib import Path
+from argparse import ArgumentParser
+
+# Add lib directory to path
+lib_path = str(Path(__file__).resolve().parent.parent / "lib")
+sys.path.insert(0, lib_path)
+
+from registry import registry
+
+
+def main():
+    parser = ArgumentParser(description="Add a new MCP server to the configuration")
+    parser.add_argument("server_name", help="Name for the MCP server")
+    parser.add_argument("http_url", help="HTTP URL of the MCP server")
+    parser.add_argument("headers_json", nargs="?", help="JSON string of additional headers")
+    args = parser.parse_args()
+    
+    try:
+        # Get current MCP configuration
+        mcp_config = registry.get("MCP_CONFIG", {"mcpServers": {}})
+        servers = mcp_config.get("mcpServers", {})
+        
+        # Parse headers if provided
+        headers = {}
+        if args.headers_json:
+            try:
+                headers = json.loads(args.headers_json)
+            except json.JSONDecodeError as e:
+                print(f"Error: Invalid JSON for headers: {e}")
+                sys.exit(1)
+        
+        # Create server configuration
+        server_config = {
+            "httpUrl": args.http_url,
+            "timeout": 300000,  # 5 minutes default
+            "trust": True
+        }
+        
+        if headers:
+            server_config["headers"] = headers
+            
+        # Add server to configuration
+        servers[args.server_name] = server_config
+        mcp_config["mcpServers"] = servers
+        
+        # Update registry
+        registry["MCP_CONFIG"] = mcp_config
+        
+        # Set as default if it's the first server
+        if not registry.get("MCP_DEFAULT_SERVER") or len(servers) == 1:
+            registry["MCP_DEFAULT_SERVER"] = args.server_name
+            print(f"✓ Added MCP server '{args.server_name}' and set as default")
+        else:
+            print(f"✓ Added MCP server '{args.server_name}'")
+            
+        print(f"  URL: {args.http_url}")
+        if headers:
+            print(f"  Headers: {len(headers)} custom headers")
+            
+        print(f"\nUse 'mcp_set_default_server {args.server_name}' to make this the default server")
+        
+    except Exception as e:
+        print(f"Error adding server: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

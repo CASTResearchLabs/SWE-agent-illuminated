@@ -1,0 +1,84 @@
+tools:
+  # Server management
+  mcp_list_servers:
+    signature: "mcp_list_servers"
+    docstring: "List all configured MCP servers"
+    arguments: []
+
+  mcp_add_server:
+    signature: "mcp_add_server <server_name> <http_url> [<headers_json>]"
+    docstring: "Add a new MCP server to the configuration"
+    arguments:
+      - name: server_name
+        type: string
+        description: "Name for the MCP server"
+        required: true
+      - name: http_url
+        type: string
+        description: "HTTP URL of the MCP server"
+        required: true
+      - name: headers_json
+        type: string
+        description: "JSON string of additional headers (optional)"
+        required: false
+
+  mcp_set_default_server:
+    signature: "mcp_set_default_server <server_name>"
+    docstring: "Set the default MCP server"
+    arguments:
+      - name: server_name
+        type: string
+        description: "Name of the server to set as default"
+        required: true
+
+  # Dynamic tool discovery - this tool queries the MCP server for available tools
+  mcp_list_tools:
+    signature: "mcp_list_tools [<server_name>]"
+    docstring: "List available tools from an MCP server"
+    arguments:
+      - name: server_name
+        type: string
+        description: "Name of MCP server (defaults to default server)"
+        required: false
+
+  # Generic tool calling interface
+  mcp_call:
+    signature: "mcp_call <tool_name> [<arguments>] [<server_name>]"
+    docstring: "Call a tool on the MCP server with JSON arguments"
+    arguments:
+      - name: tool_name
+        type: string
+        description: "Name of the MCP tool to call"
+        required: true
+      - name: arguments
+        type: string
+        description: "JSON string containing tool arguments"
+        required: false
+      - name: server_name
+        type: string
+        description: "Name of MCP server (defaults to default server)"
+        required: false
+
+  # Resource access
+  mcp_get_resource:
+    signature: "mcp_get_resource <resource_uri> [<server_name>]"
+    docstring: "Get a resource from the MCP server"
+    arguments:
+      - name: resource_uri
+        type: string
+        description: "URI of the resource to retrieve"
+        required: true
+      - name: server_name
+        type: string
+        description: "Name of MCP server (defaults to default server)"
+        required: false
+
+  # List available resources
+  mcp_list_resources:
+    signature: "mcp_list_resources [<server_name>]"
+    docstring: "List available resources on the MCP server"
+    arguments:
+      - name: server_name
+        type: string
+        description: "Name of MCP server (defaults to default server)"
+        required: false
