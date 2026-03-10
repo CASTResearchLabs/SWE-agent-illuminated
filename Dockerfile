@@ -17,6 +17,7 @@ COPY . /app
 
 # Make doc_task.sh executable
 RUN chmod +x /app/doc_task.sh
+RUN chmod +x /app/doc_task_with_mcp.sh
 
 # Accept build arguments for API key and MCP URL
 ARG IMAGING_X_API_KEY=N/A
