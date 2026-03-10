@@ -85,9 +85,9 @@ agent:
           # Provides 47+ functions for architectural analysis, dependency mapping, 
           # quality assessment, impact analysis, and modernization planning
           imaging-structural:
-            url: "http://172.31.237.125:8282/mcp"
+            url: "<your Imaging MCP URL here>"
             headers:
-              x-api-key: "Q5Fxrp3E.W7U4HfovfeE4HGHM3FacfsTyLEDcgQHf"
+              x-api-key: "<your Imaging API key here>"
             timeout: 300000
             trust: true
       MCP_DEFAULT_SERVER: "imaging-structural"

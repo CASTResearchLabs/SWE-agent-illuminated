@@ -18,11 +18,13 @@ COPY . /app
 # Make doc_task.sh executable
 RUN chmod +x /app/doc_task.sh
 
-# Accept build argument for API key
+# Accept build arguments for API key and MCP URL
 ARG IMAGING_X_API_KEY=N/A
+ARG IMAGING_MCP_URL=http://172.31.237.125:8282/mcp
 
-# Replace placeholder in config file with actual API key
-RUN sed -i "s/<your Imaging API key here>/${IMAGING_X_API_KEY}/g" /app/config/default_with_mcp.yaml
+# Replace placeholders in config file with actual values
+RUN sed -i "s/<your Imaging API key here>/${IMAGING_X_API_KEY}/g" /app/config/default_with_mcp.yaml && \
+    sed -i "s|<your Imaging MCP URL here>|${IMAGING_MCP_URL}|g" /app/config/default_with_mcp.yaml
 
 # Install Python dependencies
 RUN pip install -e '.'

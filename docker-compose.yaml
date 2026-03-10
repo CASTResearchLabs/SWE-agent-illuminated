@@ -5,11 +5,13 @@ services:
       dockerfile: ./Dockerfile
       args:
         - IMAGING_X_API_KEY=${IMAGING_X_API_KEY:-N/A}
+        - IMAGING_MCP_URL=${IMAGING_MCP_URL:-http://172.31.237.125:8282/mcp}
     image: cast0reasearch0labs/swe-agent-mcp-illuminated:latest
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-N/A}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-N/A}
       - IMAGING_X_API_KEY=${IMAGING_X_API_KEY:-N/A}
+      - IMAGING_MCP_URL=${IMAGING_MCP_URL:-http://172.31.237.125:8282/mcp}
     volumes:
       - .:/workspace
     working_dir: /workspace
