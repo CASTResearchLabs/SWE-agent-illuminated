@@ -1,35 +1,65 @@
-# Formerly called: anthropic_filemap.yaml
-# This template is heavily inspired by anthropic's computer use demo, but you can use
-# it with any LM.
+# Advanced SWE-agent with Structural Code Analysis
+# Leverages CAST Imaging structural analysis for sophisticated software engineering tasks
 agent:
   templates:
     system_template: |-
-      You are a helpful assistant that can interact with a computer to solve tasks.
+      You are an expert software engineering assistant with access to advanced structural code analysis capabilities through CAST Imaging. You can understand complex software architectures, analyze dependencies, identify quality issues, and perform sophisticated impact analysis. Use the MCP tools to gather structural intelligence before making any code changes.
     instance_template: |-
       <uploaded_files>
       {{working_dir}}
       </uploaded_files>
-      I've uploaded a python code repository in the directory {{working_dir}}. Consider the following PR description:
+      I'm working on a sophisticated software engineering task in the directory {{working_dir}}. Here's the requirement:
 
-      <pr_description>
+      <task_description>
       {{problem_statement}}
-      </pr_description>
+      </task_description>
 
-      Can you help me implement the necessary changes to the repository so that the requirements specified in the <pr_description> are met?
-      I've already taken care of all changes to any of the test files described in the <pr_description>. This means you DON'T have to modify the testing logic or any of the tests in any way!
-      Your task is to make the minimal changes to non-tests files in the {{working_dir}} directory to ensure the <pr_description> is satisfied.
-      Follow these steps to resolve the issue:
-      1. As a first step, it might be a good idea to find and read code relevant to the <pr_description>
-      2. Create a script to reproduce the error and execute it with `python <filename.py>` using the bash tool, to confirm the error
-      3. Edit the sourcecode of the repo to resolve the issue
-      4. Rerun your reproduce script and confirm that the error is fixed!
-      5. Think about edgecases and make sure your fix handles them as well
-      Your thinking should be thorough and so it's fine if it's very long.
+      You have access to CAST Imaging structural analysis through MCP tools to understand this codebase at an architectural level. Before making any changes, use these capabilities to:
+
+      **PHASE 1: Structural Discovery & Analysis**
+      1. First, identify the application in the Imaging portfolio using the `applications` function
+      2. Get an architectural overview with `stats` to understand size, technologies, and quality status
+      3. Use `architectural_graph` to understand layers and components
+      4. Analyze relevant transactions/APIs with `transactions` and `transaction_details`
+      5. Examine data flows using `data_graphs` and `data_graph_details` 
+      6. Review quality issues with `quality_insights`, `advisors`, and `iso_5055_explorer`
+
+      **PHASE 2: Impact Analysis & Planning**  
+      7. For any objects you plan to modify, use `object_details` with different focuses (inward/outward/testing)
+      8. Use `graph_intersection_analysis` to understand architectural coupling and shared code
+      9. Identify which transactions will be affected using `transactions_using_object` patterns
+      10. Map data dependencies that could be impacted
+
+      **PHASE 3: Implementation with Structural Guidance**
+      11. Make targeted changes informed by the structural analysis
+      12. Use the structural data to minimize breaking changes and architectural violations
+      13. Consider modernization opportunities (microservice extraction, library upgrades, etc.)
+
+      **PHASE 4: Validation & Testing Strategy**
+      14. Use structural analysis to identify comprehensive test coverage needs
+      15. Validate that changes don't introduce new architectural anti-patterns
+      16. Ensure quality metrics haven't degraded
+
+      **Available Structural Analysis Functions (use via MCP tools):**
+      - Discovery: `applications`, `stats`, `architectural_graph`, `transactions`, `data_graphs`, `objects`
+      - Detailed Analysis: `transaction_details`, `data_graph_details`, `object_details`, `source_file_details`
+      - Architecture: `graph_intersection_analysis`, `inter_applications_dependencies`
+      - Quality: `quality_insights`, `advisors`, `iso_5055_explorer`, `quality_insight_occurrences` 
+      - Impact Analysis: Use object details with different focus modes (inward/outward/testing)
+      - Search: `find_code_structures` for discovering relevant code across multiple entity types
+
+      **Example Applications Available:**
+      - shopizer_back_end (Java/Spring e-commerce: 272 APIs, 53 data flows, 16K objects)
+      - AWSCD, openmrs01, EMSf, ThingsBoard
+
+      Focus on leveraging the rich structural data to make informed, architecture-aware decisions rather than just pattern-matching code changes.
     next_step_template: |-
       OBSERVATION:
       {{observation}}
+      
+      Continue with your structural analysis approach, using the rich architectural data to inform your next steps.
     next_step_no_output_template: |-
-      Your command ran successfully and did not produce any output.
+      Your command ran successfully and did not produce any output. Use structural analysis tools to gather more context if needed.
   tools:
     env_variables:
       PAGER: cat
@@ -50,13 +80,11 @@ agent:
       USE_FILEMAP: 'true'
       MCP_CONFIG:
         mcpServers:
-          # default:
-          #   httpUrl: "http://localhost:3000"
-          #   timeout: 30000
-          #   trust: true
-          # Example additional servers:
+          # CAST Imaging Structural Analysis Server
+          # Provides 47+ functions for architectural analysis, dependency mapping, 
+          # quality assessment, impact analysis, and modernization planning
           imaging-structural:
-            httpUrl: "http://172.31.237.125:8282/mcp"
+            url: "http://172.31.237.125:8282/mcp"
             headers:
               x-api-key: "${IMAGING_X_API_KEY}"
             timeout: 300000
@@ -65,21 +93,28 @@ agent:
       MCP_MAX_RETRIES: 3
       SUBMIT_REVIEW_MESSAGES:
         - |
-          Thank you for your work on this issue. Please carefully follow the steps below to help review your changes.
+          Excellent work on this structural analysis-driven implementation. Your solution leverages architectural intelligence to make informed decisions.
 
-          1. If you made any changes to your code after running the reproduction script, please run the reproduction script again.
-            If the reproduction script is failing, please revisit your changes and make sure they are correct.
-            If you have already removed your reproduction script, please ignore this step.
-          2. Remove your reproduction script (if you haven't done so already).
-          3. If you have modified any TEST files, please revert them to the state they had before you started fixing the issue.
-            You can do this with `git checkout -- /path/to/test/file.py`. Use below <diff> to find the files you need to revert.
-          4. Run the submit command again to confirm.
+          **Final Review Checklist:**
 
-          Here is a list of all of your changes:
+          1. **Structural Validation**: Re-run any structural analysis queries to confirm your changes haven't introduced architectural anti-patterns or broken key dependencies.
 
+          2. **Impact Assessment**: Verify that transactions, data flows, and dependent objects identified in your analysis are still functioning correctly.
+
+          3. **Quality Metrics**: Check that your changes haven't degraded quality insights or introduced new CVEs, structural flaws, or ISO 5055 violations.
+
+          4. **Test Coverage**: Ensure all affected transactions and data graphs identified through structural analysis have appropriate test coverage.
+
+          5. **Modernization Opportunities**: Document any modernization opportunities you discovered (microservice extraction candidates, library upgrades, architectural improvements).
+
+          6. **Cleanup**: Remove any test scripts or temporary files created during analysis.
+
+          **Structural Changes Summary:**
           <diff>
           {{diff}}
           </diff>
+
+          Your approach of using structural intelligence demonstrates sophisticated software engineering practices. The architectural awareness in your solution should lead to more maintainable and robust code.
     enable_bash_tool: true
     parse_function:
       type: function_calling
