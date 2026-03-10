@@ -1,0 +1,18 @@
+services:
+  swe-agent-mcp-illuminated:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      args:
+        - IMAGING_X_API_KEY=${IMAGING_X_API_KEY:-N/A}
+    image: cast0reasearch0labs/swe-agent-mcp-illuminated:latest
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-N/A}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-N/A}
+      - IMAGING_X_API_KEY=${IMAGING_X_API_KEY:-N/A}
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    network_mode: host

@@ -70,6 +70,7 @@ agent:
       GIT_PAGER: cat
     propagate_env_variables:
       - "OPENAI_API_KEY"
+      - "GEMINI_API_KEY"
       - "IMAGING_X_API_KEY"
     bundles:
       - path: tools/registry
@@ -86,7 +87,7 @@ agent:
           imaging-structural:
             url: "http://172.31.237.125:8282/mcp"
             headers:
-              x-api-key: "${IMAGING_X_API_KEY}"
+              x-api-key: "Q5Fxrp3E.W7U4HfovfeE4HGHM3FacfsTyLEDcgQHf"
             timeout: 300000
             trust: true
       MCP_DEFAULT_SERVER: "imaging-structural"

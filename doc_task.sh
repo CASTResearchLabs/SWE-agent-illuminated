@@ -1,0 +1,1 @@
+sweagent run --config config/default_with_mcp.yaml --agent.model.name "gpt-4o" --env.repo.github_url=https://github.com/CASTResearchLabs/SWE-agent-illuminated --problem_statement.text="provide architectural overview of the code base (available as application shopizer_back_end via imaging-structural MCP server) and save it as ARCHITECTURE.md" --env.deployment.type=local
