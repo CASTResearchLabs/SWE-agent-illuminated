@@ -12,4 +12,10 @@ task: |
   then writing the final overview in ARCHITECTURE.md file. 
   Overview should include an analysis of API/UI endpoints, 
   of data entities and their call graphs, quality insights, ... 
-  Be as specific and detailed as possible.
+  
+  **DELIVERABLES (MUST CREATE FILES):**
+  - Save intermediate findings in markup files if needed
+  - CREATE and SAVE the final overview in a file named ARCHITECTURE.md
+  - Use file creation tools - DO NOT provide content in chat responses
+  
+  Be as specific and detailed as possible in the files you create.

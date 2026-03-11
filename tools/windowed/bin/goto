@@ -34,4 +34,7 @@ def main(args: List[str]) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    exit_code = main(sys.argv[1:])
+    if exit_code != 0:
+        print(f"Command failed with exit code {exit_code}")
+        # Don't call sys.exit() to avoid crashing shell

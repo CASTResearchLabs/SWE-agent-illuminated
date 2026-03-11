@@ -8,6 +8,7 @@ import time
 from pathlib import Path, PurePosixPath
 from typing import Annotated, Any, Literal
 
+import pexpect
 import yaml
 from jinja2 import Template
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -975,6 +976,9 @@ class DefaultAgent(AbstractAgent):
                 raise
             try:
                 self._env.interrupt_session()
+            except pexpect.exceptions.EOF as f:
+                self.logger.warning("Cannot interrupt session - bash shell has already terminated: %s", f)
+                # Session is dead, continue with timeout handling
             except Exception as f:
                 self.logger.exception("Failed to interrupt session after command timeout: %s", f, exc_info=True)
                 step.execution_time = time.perf_counter() - execution_t0

@@ -57,14 +57,14 @@ class MCPClient:
             if server_name not in servers:
                 # Fallback to environment variables for backward compatibility
                 config = {
-                    "url": os.environ.get("MCP_SERVER_URL", "http://localhost:3000"),
+                    "httpUrl": os.environ.get("MCP_SERVER_URL", "http://localhost:3000"),
                     "timeout": int(os.environ.get("MCP_TIMEOUT", "30")) * 1000,  # Convert to ms
                     "trust": True
                 }
             else:
                 config = servers[server_name]
         
-        self.base_url = config.get("url", "http://localhost:3000")
+        self.base_url = config.get("httpUrl", "http://localhost:3000")
         self.timeout = config.get("timeout", 30000) / 1000  # Convert ms to seconds
         self.trust = config.get("trust", True)
         self.headers = config.get("headers", {})
@@ -76,17 +76,11 @@ class MCPClient:
     
     def _create_client_config(self):
         """Create FastMCP client configuration using standard MCP format."""
-        # For single server, we can just use the URL directly
-        if not self.headers:
-            # Simple case: just use the URL directly
-            return self.base_url
-        
-        # Complex case: use configuration dictionary with proper FastMCP format
-        # NOTE: FastMCP expects "url" not "httpUrl" in config
+        # FastMCP expects configuration in MCP standard format
         mcp_config = {
             "mcpServers": {
                 self.server_name: {
-                    "url": self.base_url  # FastMCP uses "url", not "httpUrl"
+                    "httpUrl": self.base_url
                 }
             }
         }
@@ -101,58 +95,28 @@ class MCPClient:
         
         return mcp_config
     
-    def __enter__(self):
-        """Context manager entry."""
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
-        # No cleanup needed for our async client approach
-        pass
-    
     async def _execute_with_client(self, operation):
         """Execute an operation with proper FastMCP client lifecycle management."""
-        try:
-            # Create FastMCP client based on configuration type
-            client_config = self._create_client_config()
-            client = Client(client_config)
-            
-            # Use async context manager for proper connection lifecycle
-            async with client:
-                return await operation(client)
-        except Exception as e:
-            # Handle various types of errors gracefully
-            error_msg = str(e)
-            
-            # Check for common error types and provide better messages
-            if "pydantic" in error_msg.lower() or "unexpected_keyword_argument" in error_msg.lower():
-                raise MCPError(f"Invalid parameters or server configuration: {error_msg}")
-            elif "connection" in error_msg.lower() or "timeout" in error_msg.lower():
-                raise MCPError(f"Cannot connect to MCP server at {self.base_url}: {error_msg}")
-            elif "authentication" in error_msg.lower() or "unauthorized" in error_msg.lower():
-                raise MCPError(f"Authentication failed for MCP server: {error_msg}")
-            else:
-                raise MCPError(f"MCP operation failed: {error_msg}")
+        # Create FastMCP client with MCP configuration format
+        client_config = self._create_client_config()
+        client = Client(client_config)
+        
+        # Use async context manager for proper connection lifecycle
+        async with client:
+            return await operation(client)
     
     def _run_async(self, coro):
         """Run an async coroutine in a sync context."""
         try:
-            try:
-                loop = asyncio.get_running_loop()
-                # We're in an async context, need to use a different approach
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(asyncio.run, coro)
-                    return future.result()
-            except RuntimeError:
-                # No event loop running, create a new one
-                return asyncio.run(coro)
-        except MCPError:
-            # Re-raise MCPError as-is
-            raise
-        except Exception as e:
-            # Wrap unexpected errors in MCPError to prevent shell crashes
-            raise MCPError(f"Unexpected error during MCP operation: {e}")
+            loop = asyncio.get_running_loop()
+            # We're in an async context, need to use a different approach
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, coro)
+                return future.result()
+        except RuntimeError:
+            # No event loop running, create a new one
+            return asyncio.run(coro)
 
     async def _ping_async(self) -> bool:
         """Async version of ping check."""
@@ -185,15 +149,15 @@ class MCPClient:
     async def _call_tool_async(self, tool_name: str, arguments: Dict = None) -> Dict[str, Any]:
         """Async version of call tool."""
         async def call_operation(client):
-            # For multi-server config, FastMCP handles tool prefixing automatically
-            # Use the tool name as-is
-            result = await client.call_tool(tool_name, arguments or {})
+            # For multi-server config, need to prefix tool name with server
+            prefixed_tool_name = f"{self.server_name}_{tool_name}"
+            result = await client.call_tool(prefixed_tool_name, arguments or {})
             
-            # FastMCP returns a result object, extract the data according to docs
-            if hasattr(result, 'data'):
-                return {"result": result.data}
-            elif hasattr(result, 'content'):
+            # FastMCP returns a result object, extract the relevant data
+            if hasattr(result, 'content'):
                 return {"result": result.content}
+            elif hasattr(result, 'data'):
+                return {"result": result.data}
             else:
                 return {"result": result}
         
@@ -218,9 +182,15 @@ class MCPClient:
     async def _get_resource_async(self, uri: str) -> Dict[str, Any]:
         """Async version of get resource."""
         async def get_operation(client):
-            # FastMCP handles URI prefixing automatically for multi-server configs
-            # According to docs: resources use prefixed URIs like "weather://weather/icons/sunny"
-            result = await client.read_resource(uri)
+            # For multi-server config, need to prefix URI with server name
+            if "://" not in uri or uri.startswith("file://"):
+                # This is a local resource, use as-is
+                prefixed_uri = uri
+            else:
+                # This might be a server-specific resource
+                prefixed_uri = f"{self.server_name}://{uri}"
+            
+            result = await client.read_resource(prefixed_uri)
             return {"result": result}
         
         return await self._execute_with_client(get_operation)
@@ -290,20 +260,14 @@ def format_mcp_response(response: Dict[str, Any]) -> str:
                 tools = result["tools"]
                 output = ["Available MCP Tools:"]
                 for tool in tools:
-                    # FastMCP returns Tool objects, not dicts - access attributes directly
-                    name = getattr(tool, 'name', str(tool))
-                    description = getattr(tool, 'description', 'No description')
-                    output.append(f"  {name}: {description}")
+                    output.append(f"  {tool['name']}: {tool.get('description', 'No description')}")
                 return "\n".join(output)
             elif "resources" in result:
                 # Handle resources list response
                 resources = result["resources"]
                 output = ["Available MCP Resources:"]
                 for resource in resources:
-                    # FastMCP returns Resource objects, not dicts - access attributes directly
-                    uri = getattr(resource, 'uri', str(resource))
-                    description = getattr(resource, 'description', 'No description')
-                    output.append(f"  {uri}: {description}")
+                    output.append(f"  {resource['uri']}: {resource.get('description', 'No description')}")
                 return "\n".join(output)
         return json.dumps(result, indent=2)
     

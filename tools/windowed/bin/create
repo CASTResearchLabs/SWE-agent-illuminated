@@ -8,7 +8,7 @@ from windowed_file import WindowedFile  # type: ignore
 def main():
     if len(sys.argv) < 2:
         print("Usage: create <filename>")
-        sys.exit(1)
+        return 1
 
     path = Path(sys.argv[1])
     if not path.parent.is_dir():
@@ -16,14 +16,18 @@ def main():
 
     if path.exists():
         print(f"Warning: File '{path}' already exists.")
-        sys.exit(1)
+        return 1
 
     path.touch()
 
     wfile = WindowedFile(path=path)
     wfile.first_line = 0
     wfile.print_window()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    if exit_code != 0:
+        print(f"Command failed with exit code {exit_code}")
+        # Don't call sys.exit() to avoid crashing shell

@@ -79,7 +79,8 @@ fi
 
 # Add MCP server text if --with-mcp is provided
 if [ "$WITH_MCP" = true ]; then
-    TASK_TEXT=$(echo -e "(current code base is available as application ${APPLICATION_NAME} via imaging-structural MCP server)\n${TASK_TEXT}")
+    TASK_TEXT="(current code base is available as application ${APPLICATION_NAME} via imaging-structural MCP server)
+${TASK_TEXT}"
 fi
 
 # Display configuration
@@ -159,11 +160,14 @@ fi
 echo "⚡ Executing SWE-agent..."
 echo ""
 
+# Convert multiline task text to single line with \n for proper command line passing
+TASK_TEXT_SINGLE_LINE=$(echo "$TASK_TEXT" | awk '{printf "%s\\n", $0}' | sed 's/\\n$//')
+
 sweagent run \
     --config "$SWE_CONFIG" \
     --agent.model.name "$MODEL" \
     --env.repo.github_url="$TARGET_REPO" \
-    --problem_statement.text="$TASK_TEXT" \
+    --problem_statement.text="$TASK_TEXT_SINGLE_LINE" \
     --env.deployment.type="$DEPLOYMENT"
 
 echo ""

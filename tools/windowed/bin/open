@@ -5,15 +5,15 @@ from typing import Optional
 from windowed_file import FileNotOpened, WindowedFile  # type: ignore
 
 
-def main(path: Optional[str] = None, line_number: Optional[str] = None) -> None:
+def main(path: Optional[str] = None, line_number: Optional[str] = None) -> int:
     if path is None:
         try:
             WindowedFile(exit_on_exception=False).print_window()
             # If this passes, then there was already a file open and we just show it again
-            sys.exit(0)
+            return 0
         except FileNotOpened:
             print('Usage: open "<file>"')
-            sys.exit(1)
+            return 1
 
     assert path is not None
 
@@ -25,7 +25,7 @@ def main(path: Optional[str] = None, line_number: Optional[str] = None) -> None:
         except ValueError:
             print('Usage: open "<file>" [<line_number>]')
             print("Error: <line_number> must be a number")
-            sys.exit(1)
+            return 1
         if line_num > wf.n_lines:
             print(f"Warning: <line_number> ({line_num}) is greater than the number of lines in the file ({wf.n_lines})")
             print(f"Warning: Setting <line_number> to {wf.n_lines}")
@@ -40,10 +40,14 @@ def main(path: Optional[str] = None, line_number: Optional[str] = None) -> None:
 
     wf.goto(line_num - 1, mode="top")
     wf.print_window()
+    return 0
 
 
 if __name__ == "__main__":
     args = sys.argv[1:]
     file_path = args[0] if args else None
     line_number = args[1] if len(args) > 1 else None
-    main(file_path, line_number)
+    exit_code = main(file_path, line_number)
+    if exit_code != 0:
+        print(f"Command failed with exit code {exit_code}")
+        # Don't call sys.exit() to avoid crashing shell

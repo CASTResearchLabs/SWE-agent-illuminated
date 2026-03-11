@@ -42,10 +42,18 @@ def main():
             print(output)
             
     except MCPError as e:
-        print(f"MCP Error: {e}")
+        print(f"MCP Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("Operation cancelled by user", file=sys.stderr)
+        sys.exit(1)
+    except (ConnectionError, TimeoutError) as e:
+        print(f"Connection Error: {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}", file=sys.stderr)
         sys.exit(1)
 
 

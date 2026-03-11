@@ -4,6 +4,7 @@ import shlex
 from pathlib import PurePath
 from typing import Literal, Self
 
+import pexpect
 from pydantic import BaseModel, ConfigDict, Field
 from swerex.deployment.abstract import AbstractDeployment
 from swerex.deployment.config import DeploymentConfig, DockerDeploymentConfig, get_deployment
@@ -191,7 +192,16 @@ class SWEEnv:
 
     def interrupt_session(self):
         self.logger.info("Interrupting session")
-        asyncio.run(self.deployment.runtime.run_in_session(BashInterruptAction()))
+        try:
+            asyncio.run(self.deployment.runtime.run_in_session(BashInterruptAction()))
+        except pexpect.exceptions.EOF as e:
+            # Handle cases where the bash shell has already died
+            self.logger.warning("Cannot interrupt session - bash shell has already terminated: %s", e)
+            return  # Session is already dead, no need to interrupt
+        except Exception as e:
+            # Handle other runtime errors during interrupt
+            self.logger.error("Failed to interrupt session: %s", e)
+            raise
 
     # todo: return exit code?
     def communicate(
