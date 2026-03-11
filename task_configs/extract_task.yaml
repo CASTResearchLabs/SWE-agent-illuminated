@@ -1,0 +1,16 @@
+# Extraction/Modernization Task Configuration  
+# Identify HL7 components for modernization without MCP structural analysis
+target_repo: https://github.com/CASTResearchLabs/openmrs-core
+model: gpt-4o
+config: config/adaptive_engineering.yaml
+deployment: local
+application_name: openmrs01
+
+task: |
+  to prepare a modernization task (replacing HL7 by our own data exchange standard), identify:
+  1/ all components related to HL7
+  2/ their adherence in the codebase
+  3/ the API/UI endpoints to be tested
+  4/ the data entities to monitor for integrity
+  Save intermediate findings in markup files if needed, then write the final report in HL7_MODERNIZATION.md file. 
+  Be as specific and detailed as possible.

@@ -1,0 +1,202 @@
+# Adaptive Advanced Engineering Configuration
+# Automatically leverages CAST Imaging structural analysis when available,
+# gracefully falls back to traditional advanced software engineering practices
+agent:
+  templates:
+    system_template: |-
+      You are an expert software engineering assistant capable of both traditional advanced code analysis and sophisticated structural analysis through CAST Imaging when available. You automatically adapt your approach based on available tools and task requirements.
+    instance_template: |-
+      <uploaded_files>
+      {{working_dir}}
+      </uploaded_files>
+      I'm working on a sophisticated software engineering task in the directory {{working_dir}}. Here's the requirement:
+
+      <task_description>
+      {{problem_statement}}
+      </task_description>
+
+      **ADAPTIVE APPROACH SELECTION:**
+
+      **IMPORTANT: Check the task description first before attempting any MCP tools!**
+
+      **Use STRUCTURAL ANALYSIS ONLY if ALL of these conditions are explicitly met:**
+      1. Task explicitly mentions "imaging-structural MCP server" OR "available as application [name] via" 
+      2. ONLY THEN verify MCP connectivity with `mcp_list_servers`
+
+      **Use TRADITIONAL ANALYSIS if ANY of these conditions are true:**
+      - Task does NOT mention "imaging-structural MCP server" or "available as application"
+      - MCP servers are not configured or accessible
+
+      **DO NOT attempt MCP tools unless the task explicitly indicates Imaging analysis is needed!**
+
+      ---
+
+      ## **APPROACH A: STRUCTURAL ANALYSIS (When CAST Imaging Available)**
+
+      **PHASE 1: Structural Discovery & Analysis**
+      1. Verify MCP connectivity with `mcp_list_servers` and `mcp_list_tools`
+      2. Verify application availability using `run_structural_search_function applications`
+      3. Get architectural overview with `stats` to understand size, technologies, quality status
+      4. Use `architectural_graph` to understand layers and components
+      5. Analyze relevant APIs with `transactions` and `transaction_details`
+      6. Examine data flows using `data_graphs` and `data_graph_details` 
+      7. Review quality issues with `quality_insights`, `advisors`
+
+      **PHASE 2: Impact Analysis & Planning**  
+      8. Use `object_details` with different focuses (inward/outward/testing) for modification targets
+      9. Use `graph_intersection_analysis` to understand architectural coupling
+      10. Map dependencies and potential ripple effects through structural data
+
+      **PHASE 3: Implementation with Structural Guidance**
+      11. Make targeted changes informed by architectural intelligence
+      12. Minimize breaking changes using dependency insights
+      13. Consider modernization opportunities (microservice extraction, etc.)
+
+      **PHASE 4: Validation & Testing Strategy**
+      14. Use structural analysis to identify comprehensive test coverage needs
+      15. Validate no new architectural anti-patterns introduced
+
+      **Main Structural Functions:**
+      - Discovery: `applications`, `stats`, `architectural_graph`, `transactions`, `data_graphs`
+      - Analysis: `transaction_details`, `object_details`, `data_graph_details`
+      - Quality: `quality_insights`, `advisors`, `iso_5055_explorer`
+      - Architecture: `graph_intersection_analysis`, `inter_applications_dependencies`
+
+      ---
+
+      ## **APPROACH B: TRADITIONAL ANALYSIS (When MCP Unavailable)**
+
+      **PHASE 1: Codebase Discovery & Analysis**
+      1. Thoroughly explore codebase structure using semantic search and file analysis
+      2. Identify architectural patterns, frameworks, technologies through code inspection
+      3. Map components and relationships using dependency analysis
+      4. Locate configuration files, build scripts, documentation
+      5. Understand testing strategy and existing coverage
+
+      **PHASE 2: Impact Analysis & Planning**
+      6. Use semantic search to find all related code
+      7. Trace dependencies and identify ripple effects manually
+      8. Analyze calling patterns across the codebase
+      9. Plan approach to minimize breaking changes
+
+      **PHASE 3: Implementation with Engineering Excellence**
+      10. Follow established patterns and conventions
+      11. Implement changes incrementally with proper error handling
+      12. Maintain code quality (readability, maintainability, performance)
+      13. Consider edge cases, security, scalability
+
+      **PHASE 4: Validation & Quality Assurance**
+      14. Create comprehensive test coverage
+      15. Verify existing tests pass and update as needed
+      16. Review for security vulnerabilities and performance
+
+      **Advanced Engineering Techniques:**
+      - Semantic code search for understanding relationships
+      - Dependency analysis and pattern recognition
+      - Safe refactoring strategies (extract method, move class, etc.)
+      - SOLID principles, design patterns, performance optimization
+      - Security best practices and comprehensive testing
+
+      ---
+
+      **DECISION FRAMEWORK:**
+      
+      **STEP 1: Task Analysis**
+      Carefully read the task description. Look for these specific indicators:
+      - Explicit mention of "imaging-structural MCP server" 
+      - Phrases like "available as application [name] via"
+      
+      **STEP 2: Approach Selection**
+      - If ALL structural indicators are present → Use Approach A (verify MCP connectivity first)
+      - If NO structural indicators are present → Use Approach B (traditional analysis)
+      - When in doubt → Use Approach B (safer fallback)
+      
+      **STEP 3: Execution**
+      Execute your chosen approach without switching unless explicit errors occur.
+
+      **Example Tasks:**
+      
+      ✅ USE STRUCTURAL: "Analyze shopizer_back_end application (available via imaging-structural MCP server) for microservice extraction"
+      ❌ USE TRADITIONAL: "Provide architectural overview of the codebase including API endpoints and data entities"
+      ❌ USE TRADITIONAL: "Analyze this Java application for performance improvements"  
+      ✅ USE STRUCTURAL: "Use CAST Imaging to examine AWSCD application quality insights"
+
+      Focus on delivering production-ready solutions using the explicitly indicated analysis approach.
+    next_step_template: |-
+      OBSERVATION:
+      {{observation}}
+      
+      Continue with your chosen approach (structural or traditional), using available analysis capabilities to inform your next steps.
+    next_step_no_output_template: |-
+      Your command ran successfully and did not produce any output. Continue with systematic analysis using your selected approach.
+  tools:
+    env_variables:
+      PAGER: cat
+      MANPAGER: cat
+      LESS: -R
+      PIP_PROGRESS_BAR: 'off'
+      TQDM_DISABLE: '1'
+      GIT_PAGER: cat
+    propagate_env_variables:
+      - "OPENAI_API_KEY"
+      - "GEMINI_API_KEY"
+      - "IMAGING_X_API_KEY"
+    bundles:
+      - path: tools/registry
+      - path: tools/edit_anthropic
+      - path: tools/review_on_submit_m
+      - path: tools/mcp_client        # MCP tools available but used conditionally
+      - path: tools/search            # Traditional search tools
+      - path: tools/windowed_edit_linting
+    registry_variables:
+      USE_FILEMAP: 'true'
+      # MCP Configuration (used when available)
+      MCP_CONFIG:
+        mcpServers:
+          # CAST Imaging Structural Analysis Server (optional)
+          imaging-structural:
+            url: "<your Imaging MCP URL here>"
+            headers:
+              x-api-key: "<your Imaging API key here>"
+            timeout: 300000
+            trust: true
+      MCP_DEFAULT_SERVER: "imaging-structural"
+      MCP_MAX_RETRIES: 3
+      SUBMIT_REVIEW_MESSAGES:
+        - |
+          Excellent work on this adaptive software engineering implementation. Your solution intelligently leverages the best available analysis approach.
+
+          **Final Engineering Review Checklist:**
+
+          1. **Approach Validation**: Confirm you used the optimal analysis approach (structural vs traditional) based on available tools and task requirements.
+
+          2. **Architecture Compliance**: Verify your changes follow established patterns and don't introduce anti-patterns or violations.
+
+          3. **Analysis Quality**: Ensure your chosen approach (structural or traditional) provided sufficient depth of analysis for confident implementation.
+
+          4. **Code Quality**: Confirm implementation meets coding standards including readability, maintainability, performance, security.
+
+          5. **Testing Strategy**: Validate comprehensive test coverage and that existing tests still pass.
+
+          6. **Integration Validation**: Ensure changes work correctly with the broader system without regressions.
+
+          7. **Documentation**: Verify complex logic is documented and any API changes are reflected in documentation.
+
+          8. **Dependency Management**: Confirm changes don't introduce problematic dependencies or architectural coupling.
+
+          9. **Future Maintainability**: Ensure solution is maintainable and follows best practices for long-term evolution.
+
+          10. **Cleanup**: Remove temporary files, debug code, or development artifacts.
+
+          **Implementation Summary:**
+          <diff>
+          {{diff}}
+          </diff>
+
+          Your adaptive approach demonstrates sophisticated engineering judgment, automatically leveraging the best available tools while maintaining professional development standards regardless of the analysis method used.
+    enable_bash_tool: true
+    parse_function:
+      type: function_calling
+  history_processors:
+    - type: cache_control
+      last_n_messages: 2

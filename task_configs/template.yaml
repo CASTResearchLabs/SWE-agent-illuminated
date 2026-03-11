@@ -1,0 +1,25 @@
+# Example: Custom Task Configuration Template
+# Copy and modify this template for your own tasks
+target_repo: https://github.com/your-org/your-repo
+model: gpt-4o                                    # or claude-3-5-sonnet-20241022
+config: config/adaptive_engineering.yaml        # or config/advanced_engineering.yaml
+deployment: local                                # or modal
+
+task: |
+  Your multi-line task description here.
+  
+  You can include:
+  - Multiple lines for readability
+  - Specific requirements and constraints
+  - Expected deliverables and formats
+  - Any special instructions
+  
+  For MCP structural analysis, include phrases like:
+  "available as application [name] via imaging-structural MCP server"
+  
+  Examples:
+  - Code analysis and refactoring tasks
+  - Architecture documentation generation  
+  - Legacy system modernization planning
+  - Quality assessment and improvement
+  - Microservice extraction analysis
