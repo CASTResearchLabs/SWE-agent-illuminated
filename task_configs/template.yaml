@@ -1,7 +1,7 @@
 # Example: Custom Task Configuration Template
 # Copy and modify this template for your own tasks
 target_repo: https://github.com/your-org/your-repo
-model: gpt-4o                                    # or claude-3-5-sonnet-20241022
+model: claude-sonnet-4-20250514                                    # or claude-3-5-sonnet-20241022
 config: config/adaptive_engineering.yaml        # or config/advanced_engineering.yaml
 deployment: local                                # or modal
 

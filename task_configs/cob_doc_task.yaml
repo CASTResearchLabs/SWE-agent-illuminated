@@ -1,12 +1,15 @@
 # Documentation Task Configuration
 # Generate architectural overview without MCP structural analysis
 target_repo: https://github.com/CAST-Copilot/aws-mainframe-modernization-carddemo
-model: gpt-4o
+model: claude-sonnet-4-20250514
 config: config/adaptive_engineering.yaml
 deployment: local
 application_name: AWSCD
 
 task: |
-  provide architectural overview of the code base, saving intermediate findings in markup files if needed, 
-  then writing the final overview in ARCHITECTURE.md file. Overview should include an analysis of API/UI endpoints, 
-  of data entities and their call graphs, quality insights, ... Be as specific and detailed as possible.
+  Provide architectural overview of the code base, 
+  saving intermediate findings in markup files if needed, 
+  then writing the final overview in ARCHITECTURE.md file. 
+  Overview should include an analysis of API/UI endpoints, 
+  of data entities and their call graphs, quality insights, ... 
+  Be as specific and detailed as possible.

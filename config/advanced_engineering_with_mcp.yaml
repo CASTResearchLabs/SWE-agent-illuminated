@@ -70,8 +70,9 @@ agent:
       GIT_PAGER: cat
     propagate_env_variables:
       - "OPENAI_API_KEY"
-      - "GEMINI_API_KEY"
+      - "ANTHROPIC_API_KEY"
       - "IMAGING_X_API_KEY"
+      - "IMAGING_MCP_URL"
     bundles:
       - path: tools/registry
       - path: tools/edit_anthropic
