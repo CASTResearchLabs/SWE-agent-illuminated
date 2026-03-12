@@ -27,35 +27,39 @@ def main():
                 tool_args = json.loads(args.arguments)
             except json.JSONDecodeError as e:
                 print(f"Error: Invalid JSON arguments: {e}")
-                sys.exit(1)
+                return 1
         
         with get_mcp_client(server_name=args.server_name) as client:
             # Check server connectivity
             if not client.ping():
                 server_name = args.server_name or "default"
                 print(f"Error: Cannot reach MCP server '{server_name}' at {client.base_url}")
-                sys.exit(1)
+                return 1
             
             # Call the tool
             response = client.call_tool(args.tool_name, tool_args)
             output = format_mcp_response(response)
             print(output)
+            return 0
             
     except MCPError as e:
         print(f"MCP Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        return 1
     except KeyboardInterrupt:
         print("Operation cancelled by user", file=sys.stderr)
-        sys.exit(1)
+        return 1
     except (ConnectionError, TimeoutError) as e:
         print(f"Connection Error: {e}", file=sys.stderr)
-        sys.exit(1)
+        return 1
     except Exception as e:
         print(f"Unexpected error: {e}", file=sys.stderr)
         import traceback
         print(f"Traceback: {traceback.format_exc()}", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    exit_code = main()
+    if exit_code != 0:
+        print(f"Command failed with exit code {exit_code}", file=sys.stderr)
+        # Don't call sys.exit() to avoid crashing shell

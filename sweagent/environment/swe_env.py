@@ -226,10 +226,27 @@ class SWEEnv:
             output: output from container
         """
         self.logger.log(logging.TRACE, "Input:\n%s", input)  # type: ignore
+        
         rex_check = "silent" if check else "ignore"
-        r = asyncio.run(
-            self.deployment.runtime.run_in_session(BashAction(command=input, timeout=timeout, check=rex_check))
-        )
+        try:
+            r = asyncio.run(
+                self.deployment.runtime.run_in_session(BashAction(command=input, timeout=timeout, check=rex_check))
+            )
+        except pexpect.exceptions.EOF as e:
+            self.logger.error("Bash shell terminated unexpectedly during command execution: %s", e)
+            self.logger.error("Command that caused termination: %s", input)
+            # Return error instead of trying complex recovery that may fail
+            error_output = f"ERROR: Bash shell terminated unexpectedly during command execution.\nCommand: {input}\nError: {e}\n\nThis typically indicates a tool crashed. The shell will be restarted automatically on the next command."
+            if check == "raise":
+                raise RuntimeError(error_output)
+            return error_output
+        except Exception as e:
+            self.logger.error("Unexpected error during command execution: %s", e)
+            error_output = f"ERROR: Command execution failed. Command: {input}\nError: {e}"
+            if check == "raise":
+                raise RuntimeError(error_output)
+            return error_output
+        
         output = r.output
         self.logger.log(logging.TRACE, "Output:\n%s", output)  # type: ignore
         if check != "ignore" and r.exit_code != 0:

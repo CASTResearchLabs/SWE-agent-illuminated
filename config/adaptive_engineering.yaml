@@ -30,48 +30,67 @@ agent:
 
       **IMPORTANT: Check the task description first before attempting any MCP tools!**
 
-      **Use STRUCTURAL ANALYSIS ONLY if ALL of these conditions are explicitly met:**
-      1. Task explicitly mentions "imaging-structural MCP server" OR "available as application [name] via" 
+      **Use LAYERED ANALYSIS if ALL of these conditions are met:**
+      1. Task explicitly mentions "imaging-structural MCP server" OR "available as application [name] via"
       2. ONLY THEN verify MCP connectivity with `mcp_list_servers`
 
-      **Use TRADITIONAL ANALYSIS if ANY of these conditions are true:**
+      When structural analysis IS available, it provides architectural-level intelligence
+      (layer distribution, transactions, quality issues, object counts) but CANNOT replace
+      source code reading for method signatures, field-level schemas, and specific code
+      patterns. You MUST always complement structural findings with traditional source
+      analysis for these details.
+
+      **Use TRADITIONAL ANALYSIS ONLY if ANY of these conditions are true:**
       - Task does NOT mention "imaging-structural MCP server" or "available as application"
       - MCP servers are not configured or accessible
 
-      **DO NOT attempt MCP tools unless the task explicitly indicates Imaging analysis is needed!**
-
       ---
 
-      ## **APPROACH A: STRUCTURAL ANALYSIS (When CAST Imaging Available)**
+      ## **APPROACH A: LAYERED ANALYSIS (Structural + Traditional)**
 
-      **PHASE 1: Structural Discovery & Analysis**
+      **PHASE 1: Structural Discovery (MCP)**
       1. Verify MCP connectivity with `mcp_list_servers` and `mcp_list_tools`
-      2. Verify application availability using `mcp_call run_structural_search_function '{"function_name":"applications", "arguments": {}}' imaging-structural`
-      3. Get architectural overview with `mcp_call run_structural_search_function '{"function_name":"stats", "arguments": {"application":"application_name"}}' imaging-structural`
-      4. Use `mcp_call run_structural_search_function '{"function_name":"architectural_graph", "arguments": {"application":"application_name"}}' imaging-structural` to understand layers
-      5. Analyze APIs with `mcp_call run_structural_search_function '{"function_name":"transactions", "arguments": {"application":"application_name"}}' imaging-structural`
-      6. Examine data flows using `mcp_call run_structural_search_function '{"function_name":"data_graphs", "arguments": {"application":"application_name"}}' imaging-structural`
-      7. Review quality issues with `mcp_call run_structural_search_function '{"function_name":"quality_insights", "arguments": {"application":"application_name"}}' imaging-structural`
+      2. Verify application availability using the `applications` function
+      3. Get architectural overview: `stats`, `architectural_graph`, `transactions`, 
+        `data_graphs`, `quality_insights`
+      4. Use `object_details` for modification targets (inward/outward/testing focus)
+      5. Use `graph_intersection_analysis` to understand architectural coupling
 
-      **PHASE 2: Impact Analysis & Planning**  
-      8. Use `mcp_call run_structural_search_function '{"function_name":"object_details", "arguments": {"application":"application_name", "object":"object_name"}}' imaging-structural` with different focuses (inward/outward/testing) for modification targets
-      9. Use `mcp_call run_structural_search_function '{"function_name":"graph_intersection_analysis", "arguments": {"application":"application_name"}}' imaging-structural` to understand architectural coupling
-      10. Map dependencies and potential ripple effects through structural data
+      **STRUCTURAL ANALYSIS PROVIDES:** layer distribution and object counts, transaction
+      entry points and sizes, data graph flows, quality issues (CVEs, cloud blockers,
+      ISO 5055), design patterns and coupling. Record all of this before proceeding.
 
-      **PHASE 3: Implementation with Structural Guidance**
-      11. Make targeted changes informed by architectural intelligence
-      12. Minimize breaking changes using dependency insights
-      13. Consider modernization opportunities (microservice extraction, etc.)
+      **PHASE 2: Traditional Deep-Dive (Source Code) — MANDATORY, DO NOT SKIP**
+      Even when structural analysis is complete, you MUST perform traditional source
+      analysis to capture what the structural model does not expose:
 
-      **PHASE 4: Validation & Testing Strategy**
-      14. Use structural analysis to identify comprehensive test coverage needs
-      15. Validate no new architectural anti-patterns introduced
+      - **Service method signatures:** Use grep/semantic search to enumerate ALL public
+        methods on service interfaces (e.g. `grep -r "public.*HL7Service" --include="*.java"`).
+        Do NOT leave these as "to be identified in detailed analysis" placeholders — the
+        task requires them.
+      - **Message handlers:** Search for ALL handler classes, not just those surfaced by
+        the structural model. Run: `find . -name "*Handler.java" | xargs grep -l "HL7"`.
+        The structural model may surface only the most-referenced handlers; source search
+        finds all of them.
+      - **Database field-level schema:** Inspect entity classes and Hibernate mapping files
+        for field names, types, and size constraints. The structural model identifies tables
+        but not column definitions.
+      - **Constants and enumerations:** Search for all status values, privilege strings, and
+        configuration property keys defined in source.
 
-      **Main Structural Functions:**
-      - Discovery: `mcp_call run_structural_search_function '{"function_name":"applications", "arguments": {}}' imaging-structural`, `mcp_call run_structural_search_function '{"function_name":"stats", "arguments": {"application":"app_name"}}' imaging-structural`
-      - Analysis: `mcp_call run_structural_search_function '{"function_name":"transaction_details", "arguments": {"application":"app_name", "transaction_id":"id"}}' imaging-structural`
-      - Quality: `mcp_call run_structural_search_function '{"function_name":"quality_insights", "arguments": {"application":"app_name"}}' imaging-structural`
-      - Architecture: `mcp_call run_structural_search_function '{"function_name":"architectural_graph", "arguments": {"application":"app_name"}}' imaging-structural`
+      **PHASE 2 OUTPUT:** A complete inventory of API method signatures, all handler classes,
+      field-level schema details, and constants — merged with Phase 1 structural findings.
+
+      **PHASE 3: Impact Analysis & Planning**
+      Combine structural dependency data (Phase 1) with source-level detail (Phase 2)
+      to produce a unified impact assessment. Flag any discrepancies between the structural
+      model and the source (e.g. components in source not reflected in the model).
+
+      **PHASE 4: Implementation with Structural Guidance**
+      Make targeted changes informed by both architectural intelligence and source detail.
+
+      **PHASE 5: Validation**
+      Use structural analysis to identify test coverage needs, validate against source.
 
       ---
 
@@ -127,11 +146,17 @@ agent:
 
       **Example Tasks:**
       
-      ✅ USE STRUCTURAL: "Analyze shopizer_back_end application (available via imaging-structural MCP server) for microservice extraction"
-      ❌ USE TRADITIONAL: "Provide architectural overview of the codebase including API endpoints and data entities"
-      ❌ USE TRADITIONAL: "Analyze this Java application for performance improvements"  
-      ✅ USE STRUCTURAL: "Use CAST Imaging to examine AWSCD application quality insights"
+      ✅ USE LAYERED (Structural + Traditional): "Analyze shopizer_back_end application 
+        (available via imaging-structural MCP server)..."
+        → Run MCP structural phases first, then MANDATORY source deep-dive for 
+          method signatures, all handler classes, and field-level schema.
 
+      ❌ USE TRADITIONAL ONLY: "Provide architectural overview of the codebase..."
+      ❌ USE TRADITIONAL ONLY: "Analyze this Java application for performance improvements"
+      ✅ USE LAYERED: "Use CAST Imaging to examine AWSCD application quality insights"
+        → MCP for quality/architecture overview, then source search to validate 
+          completeness and fill in method/field detail.
+      
       Focus on delivering production-ready solutions using the explicitly indicated analysis approach.
     next_step_template: |-
       OBSERVATION:
@@ -199,6 +224,16 @@ agent:
           9. **Future Maintainability**: Ensure solution is maintainable and follows best practices for long-term evolution.
 
           10. **Cleanup**: Remove temporary files, debug code, or development artifacts.
+
+          **Layered Analysis Completeness** (when structural analysis was used):
+          - [ ] Structural model findings (layers, transactions, quality issues) are documented
+          - [ ] ALL service interface methods are enumerated from source — no placeholders like 
+                "to be identified in detailed analysis"
+          - [ ] Handler class search was performed against source files, not inferred from 
+                structural model alone — verify no handlers are missing
+          - [ ] Field-level database schema (column names, types, sizes) was read from entity 
+                classes or Hibernate mappings, not just table names from structural model
+          - [ ] Any gap between structural model coverage and source reality is explicitly noted
 
           **Implementation Summary:**
           <diff>
