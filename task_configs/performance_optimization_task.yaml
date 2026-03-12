@@ -1,0 +1,46 @@
+# Performance Optimization Task Configuration
+# Eliminate SQL queries in loops for OpenMRS performance enhancement
+target_repo: https://github.com/CASTResearchLabs/openmrs-core
+model: claude-sonnet-4-20250514
+config: config/adaptive_engineering.yaml
+deployment: local
+application_name: openmrs01
+
+task: |
+  OpenMRS contains performance anti-patterns including SQL queries executed within loops and 
+  remote calls in loops. Your task is to conduct deep structural analysis 
+  to create an optimized remediation plan focused on maximum performance impact.
+  
+  Through comprehensive code analysis and profiling, perform thorough investigation:
+  
+  **Phase 1: Performance Hotspot Discovery**
+  1. Search for and identify all methods/classes with SQL queries in loops and remote calls in loops
+  2. Analyze the complexity of user operations and workflows that contain these performance bottlenecks
+  3. Map which architectural components (business logic, data access, web controllers) are most affected
+  4. Determine the call frequency and nesting depth of these problematic loops through code analysis
+  
+  **Phase 2: Database Impact Assessment**
+  1. Trace which specific database tables are accessed within these loops
+  2. Identify data access patterns and determine if they can be converted to batch operations
+  3. Map data graphs that flow through these performance bottlenecks
+  4. Assess JPA/Hibernate entity relationships that could benefit from eager loading strategies
+  
+  **Phase 3: Transaction Flow Analysis**
+  3. Prioritize fixes based on operation complexity and public API visibility
+  4. Identify critical user workflows (like complex context initialization) that may be impacted
+  3. Map dependencies between loop-heavy objects to find strategic refactoring points
+  4. Analyze if performance fixes in shared utility classes could solve multiple hotspots
+  
+  **Phase 4: Architectural Optimization Strategy**
+  1. Design batch processing alternatives for high-frequency database operations
+  2. Identify opportunities for caching mechanisms based on call patterns
+  3. Plan database query consolidation strategies using JOIN operations
+  4. Assess impact on Spring beans and service layer architecture
+  
+  **DELIVERABLES (MUST CREATE FILES):**
+  - Create PERFORMANCE_HOTSPOT_ANALYSIS.md with detailed structural findings
+  - Create OPTIMIZATION_STRATEGY.md with prioritized performance improvements
+  - Create BATCH_PROCESSING_PLAN.md detailing database operation consolidation opportunities
+  - Create TESTING_PERFORMANCE.md mapping critical transactions requiring performance validation  
+  Focus on solutions that leverage the existing Spring/Hibernate architecture while 
+  maximizing performance gains through minimal architectural disruption.

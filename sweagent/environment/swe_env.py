@@ -79,6 +79,7 @@ class SWEEnv:
         self.name = name
         self.clean_multi_line_functions = lambda x: x
         self._chook = CombinedEnvHooks()
+        self._shell_crashed = False  # Track when shell needs restart
         for hook in hooks or []:
             self.add_hook(hook)
 
@@ -110,6 +111,7 @@ class SWEEnv:
     def start(self) -> None:
         """Start the environment and reset it to a clean state."""
         self._init_deployment()
+        self._shell_crashed = False  # Reset crash flag on start
         self.reset()
         for command in self._post_startup_commands:
             self.communicate(command, check="raise", timeout=self.post_startup_command_timeout)
@@ -204,6 +206,47 @@ class SWEEnv:
             raise
 
     # todo: return exit code?
+    def _is_mcp_command(self, input_str: str) -> bool:
+        """Check if the command is likely an MCP tool command that might crash the shell."""
+        mcp_indicators = [
+            "run_structural_search_function",
+            "get_structural_search_function_syntax",
+            "mcp_castimaging_",
+            "structural_search_function",
+            "_castimaging_",
+        ]
+        return any(indicator in input_str for indicator in mcp_indicators)
+    
+    def _safe_execute_command(self, input_str: str, timeout: int | float, rex_check: str) -> tuple[str | None, int | None]:
+        """Safely execute a command with MCP tool crash protection.
+        
+        Returns:
+            tuple: (output, exit_code) if successful, (None, None) if the command should be retried 
+            after recovery, or (error_message, None) for unrecoverable errors.
+        """
+        try:
+            r = asyncio.run(
+                self.deployment.runtime.run_in_session(BashAction(command=input_str, timeout=timeout, check=rex_check))
+            )
+            return r.output, r.exit_code
+        except pexpect.exceptions.EOF as e:
+            self.logger.error("Bash shell terminated unexpectedly during command execution: %s", e)
+            self.logger.error("Command that caused termination: %s", input_str)
+            self._shell_crashed = True
+            
+            # If it's an MCP command, try to provide graceful fallback
+            if self._is_mcp_command(input_str):
+                self.logger.warning("MCP tool appears to have crashed the shell. Shell will be restarted.")
+                return None, None  # Signal that retry after restart is needed
+            else:
+                # For non-MCP commands, return error immediately
+                error_output = f"ERROR: Bash shell terminated unexpectedly during command execution.\nCommand: {input_str}\nError: {e}\n\nThe shell will be restarted before the next command."
+                return error_output, None
+        except Exception as e:
+            self.logger.error("Unexpected error during command execution: %s", e)
+            error_output = f"ERROR: Command execution failed. Command: {input_str}\nError: {e}"
+            return error_output, None
+
     def communicate(
         self,
         input: str,
@@ -225,37 +268,68 @@ class SWEEnv:
         Returns:
             output: output from container
         """
+        # Check if shell crashed and restart it
+        if self._shell_crashed:
+            self.logger.info("Shell crashed previously. Attempting automatic restart...")
+            try:
+                self.hard_reset()
+                self.logger.info("Shell successfully restarted.")
+            except Exception as e:
+                self.logger.error("Failed to restart shell: %s", e)
+                if check == "raise":
+                    raise RuntimeError(f"Shell restart failed after crash: {e}")
+                return f"ERROR: Shell restart failed after previous crash: {e}"
+        
         self.logger.log(logging.TRACE, "Input:\n%s", input)  # type: ignore
         
         rex_check = "silent" if check else "ignore"
-        try:
-            r = asyncio.run(
-                self.deployment.runtime.run_in_session(BashAction(command=input, timeout=timeout, check=rex_check))
-            )
-        except pexpect.exceptions.EOF as e:
-            self.logger.error("Bash shell terminated unexpectedly during command execution: %s", e)
-            self.logger.error("Command that caused termination: %s", input)
-            # Return error instead of trying complex recovery that may fail
-            error_output = f"ERROR: Bash shell terminated unexpectedly during command execution.\nCommand: {input}\nError: {e}\n\nThis typically indicates a tool crashed. The shell will be restarted automatically on the next command."
-            if check == "raise":
-                raise RuntimeError(error_output)
-            return error_output
-        except Exception as e:
-            self.logger.error("Unexpected error during command execution: %s", e)
-            error_output = f"ERROR: Command execution failed. Command: {input}\nError: {e}"
-            if check == "raise":
-                raise RuntimeError(error_output)
-            return error_output
         
-        output = r.output
+        # Try safe execution with crash handling
+        output, exit_code = self._safe_execute_command(input, int(timeout), rex_check)
+        
+        if output is None:
+            # This means an MCP command crashed and we should retry after restart
+            if self._shell_crashed:
+                try:
+                    self.logger.info("Restarting shell after MCP tool crash...")
+                    self.hard_reset()
+                    # Retry the command once after restart
+                    output, exit_code = self._safe_execute_command(input, int(timeout), rex_check)
+                    if output is None:  # Still failed after restart
+                        error_output = f"ERROR: Command failed even after shell restart.\nCommand: {input}\n\nThis usually indicates a persistent issue with the command or environment."
+                        if check == "raise":
+                            raise RuntimeError(error_output)
+                        return error_output
+                except Exception as e:
+                    self.logger.error("Failed to restart shell after MCP crash: %s", e)
+                    error_output = f"ERROR: Shell restart failed after MCP tool crash: {e}"
+                    if check == "raise":
+                        raise RuntimeError(error_output)
+                    return error_output
+            else:
+                # Shouldn't happen, but handle gracefully
+                error_output = f"ERROR: Unexpected state during command execution. Command: {input}"
+                if check == "raise":
+                    raise RuntimeError(error_output)
+                return error_output
+        
         self.logger.log(logging.TRACE, "Output:\n%s", output)  # type: ignore
-        if check != "ignore" and r.exit_code != 0:
+        
+        # For commands that ran successfully, check exit code if requested
+        if check != "ignore" and exit_code is not None and exit_code != 0:
             self.logger.error(f"{error_msg}:\n{output}")
-            msg = f"Command {input!r} failed ({r.exit_code=}): {error_msg}"
+            msg = f"Command {input!r} failed ({exit_code=}): {error_msg}"
             self.logger.error(msg)
             if check == "raise":
                 self.close()
                 raise RuntimeError(msg)
+        elif check != "ignore" and "ERROR:" in str(output):
+            # Handle error messages from our crash recovery
+            if check == "warn":
+                self.logger.warning(f"{error_msg}:\n{output}")
+            elif check == "raise":
+                raise RuntimeError(f"Command {input!r} failed: {error_msg}")
+            
         return output
 
     def read_file(self, path: str | PurePath, encoding: str | None = None, errors: str | None = None) -> str:

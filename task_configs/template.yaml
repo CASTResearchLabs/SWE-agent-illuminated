@@ -4,6 +4,7 @@ target_repo: https://github.com/your-org/your-repo
 model: claude-sonnet-4-20250514                                    # or claude-3-5-sonnet-20241022
 config: config/adaptive_engineering.yaml        # or config/advanced_engineering.yaml
 deployment: local                                # or modal
+application_name: appname
 
 task: |
   Your multi-line task description here.
@@ -14,8 +15,7 @@ task: |
   - Expected deliverables and formats
   - Any special instructions
   
-  For MCP structural analysis, include phrases like:
-  "available as application [name] via imaging-structural MCP server"
+  For MCP structural analysis, make sure to specify the application_name value and run the task with the `--with-mcp` flag
   
   Examples:
   - Code analysis and refactoring tasks

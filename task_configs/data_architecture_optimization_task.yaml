@@ -1,0 +1,67 @@
+# Data Architecture Optimization Task Configuration
+# Optimize database access patterns and JPA entity relationships in OpenMRS
+target_repo: https://github.com/CASTResearchLabs/openmrs-core
+model: claude-sonnet-4-20250514
+config: config/adaptive_engineering.yaml
+deployment: local
+application_name: openmrs01
+
+task: |
+  OpenMRS shows significant database complexity with multiple data flows, numerous database service objects,
+  and multiple performance issues related to database access patterns. Conduct structural analysis 
+  to optimize data architecture while maintaining data integrity and clinical workflow compatibility.
+  
+  Through systematic code analysis and data flow tracing, perform comprehensive data architecture analysis:
+  
+  **Phase 1: Database Interaction Pattern Discovery**
+  1. Analyze data flow patterns throughout the application to understand complete data pathways
+  2. Map database service classes and their interaction patterns through code analysis
+  3. Trace database access from complex initialization processes and startup workflows
+  4. Identify data access patterns in critical operations like HL7 processing and clinical workflows
+  
+  **Phase 2: JPA/Hibernate Entity Relationship Analysis**
+  1. Map all JPA entities and their relationship dependencies
+  2. Analyze Hibernate configuration impacts across architectural components
+  3. Trace entity usage patterns through business logic services
+  4. Identify entity relationship chains that could benefit from optimization
+  
+  **Phase 3: Database Performance Bottleneck Assessment**
+  1. Correlate SQL queries in loops with specific database tables and operations
+  2. Map database operations in remote calls within loops violations
+  3. Analyze transaction boundaries and entity loading strategies
+  4. Identify N+1 query problems and lazy loading optimization opportunities
+  
+  **Phase 4: Data Integrity & Migration Planning**
+  1. Analyze database schema dependencies across all data flow patterns
+  2. Map sensitive data handling patterns (application handles sensitive medical data)
+  3. Trace data validation patterns and constraint enforcement
+  4. Identify critical data relationships that require careful migration handling
+  
+  **Phase 5: Caching Strategy Development**
+  1. Analyze data access frequency patterns across transactions
+  2. Identify read-heavy vs write-heavy data patterns
+  3. Map shared data access points that could benefit from caching layers
+  4. Design cache invalidation strategies based on data dependency analysis
+  
+  **Phase 6: Database Security Assessment**
+  1. Trace data access patterns involved in second-order SQL injection vulnerabilities
+  2. Map user data access permissions and authorization patterns
+  3. Analyze database transaction boundaries for security isolation
+  4. Plan secure data access abstraction layers
+  
+  **Phase 7: Scalability Architecture Design**
+  1. Identify database operations suitable for read replica optimization
+  2. Plan data archiving strategies based on data lifecycle analysis
+  3. Design horizontal scaling approaches for high-volume clinical data
+  4. Map connection pooling optimization opportunities
+  
+  **DELIVERABLES (MUST CREATE FILES):**
+  - Create DATABASE_ARCHITECTURE_ANALYSIS.md with complete data flow mapping
+  - Create JPA_OPTIMIZATION_STRATEGY.md detailing entity relationship improvements
+  - Create PERFORMANCE_TUNING_PLAN.md targeting database operation efficiency
+  - Create CACHING_STRATEGY.md with intelligent cache layer design
+  - Create DATA_SECURITY_ARCHITECTURE.md addressing secure data access patterns
+  - Create SCALABILITY_ROADMAP.md for future data growth management
+  
+  Leverage structural intelligence to design data architecture optimizations that improve 
+  performance while maintaining the complex clinical data relationships essential to OpenMRS functionality.

@@ -1,0 +1,54 @@
+# HL7 Modernization Impact Analysis Task Configuration
+# Comprehensive structural analysis for HL7 system replacement in OpenMRS
+target_repo: https://github.com/CASTResearchLabs/openmrs-core
+model: claude-sonnet-4-20250514
+config: config/adaptive_engineering.yaml
+deployment: local
+application_name: openmrs01
+
+task: |
+  Plan the replacement of HL7 components with a modern data exchange standard in OpenMRS.
+  This task leverages comprehensive structural analysis to understand the true scope and 
+  interdependencies before making any code changes.
+  
+  Through systematic code analysis and dependency mapping, conduct deep architectural analysis:
+  
+  **Phase 1: HL7 Component Discovery & Mapping**
+  1. Search for and identify all classes, methods, and components related to HL7 functionality across the entire codebase
+  2. Analyze complex HL7 processing workflows like HL7InArchivesMigrateThread for complete dependency understanding
+  3. Map HL7 components across architectural layers (communication, business logic, data persistence)
+  4. Trace data flow patterns involving HL7 message processing and storage through code analysis
+  
+  **Phase 2: Integration Point Analysis**
+  1. Identify all public and private API endpoints that consume or produce HL7 data
+  2. Map database tables and JPA entities involved in HL7 message persistence
+  3. Analyze Spring bean dependencies and service layer integrations with HL7 components  
+  4. Trace communication patterns between HL7 processing and other OpenMRS modules
+  
+  **Phase 3: Impact Radius Assessment**
+  1. Map all transactions that directly or indirectly depend on HL7 functionality
+  2. Identify shared utility objects that bridge HL7 processing with core OpenMRS features
+  3. Analyze call hierarchies to understand upstream callers and downstream impacts
+  4. Assess interdependencies with user authentication, patient data management, and clinical workflows
+  
+  **Phase 4: Migration Strategy Development**
+  1. Design phased replacement approach minimizing disruption to critical transactions
+  2. Identify interface abstraction points for seamless standard replacement
+  3. Plan backward compatibility requirements for existing HL7 message archives
+  4. Map testing scope across all affected transactions and data flows
+  
+  **Phase 5: Quality & Security Considerations**
+  1. Assess if HL7 components are involved in any security vulnerabilities or structural flaws
+  2. Identify performance implications of current HL7 message processing patterns
+  3. Analyze data integrity requirements for message format migration
+  4. Plan validation strategies for message transformation accuracy
+  
+  **DELIVERABLES (MUST CREATE FILES):**
+  - Create HL7_STRUCTURAL_ANALYSIS.md with complete component mapping and dependencies
+  - Create MIGRATION_IMPACT_ASSESSMENT.md detailing architectural implications
+  - Create REPLACEMENT_STRATEGY.md with phased implementation plan
+  - Create INTEGRATION_TESTING_SCOPE.md mapping all affected transactions and data flows
+  - Create BACKWARD_COMPATIBILITY_PLAN.md addressing legacy HL7 message handling
+  
+  Emphasize preparation over implementation - use structural intelligence to design a 
+  migration strategy that minimizes risk and maximizes compatibility with existing OpenMRS workflows.

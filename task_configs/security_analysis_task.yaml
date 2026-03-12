@@ -1,0 +1,39 @@
+# Security Analysis Task Configuration  
+# Assess and prepare remediation plan for SQL injection vulnerabilities in OpenMRS
+target_repo: https://github.com/CASTResearchLabs/openmrs-core
+model: claude-sonnet-4-20250514
+config: config/adaptive_engineering.yaml
+deployment: local
+application_name: openmrs01
+
+task: |
+  The OpenMRS application has been flagged with critical second-order SQL injection vulnerabilities. 
+  Your task is to conduct comprehensive structural analysis to prepare a security remediation strategy.
+  
+  Through thorough code analysis and dependency tracking, analyze the application structure to:
+  
+  **Phase 1: Vulnerability Discovery & Impact Assessment**
+  1. Search for and identify all code components with SQL injection vulnerabilities (dynamic SQL construction, unsanitized inputs)
+  2. Map the complete call hierarchy for each vulnerable component (both upstream callers and downstream dependencies)
+  3. Trace which user-facing operations and data flows involve these vulnerable components
+  4. Assess the architectural layers involved (web controllers, business logic, data access layers)
+  
+  **Phase 2: Risk Analysis & Blast Radius Assessment** 
+  1. Determine which user-facing endpoints could trigger these vulnerabilities
+  2. Identify all database tables that could be compromised through these injection points
+  3. Map inter-component dependencies that could amplify the security impact
+  4. Analyze if any of the vulnerable objects are used in authentication/authorization flows
+  
+  **Phase 3: Strategic Remediation Planning**
+  1. Prioritize vulnerabilities based on their position in critical transaction flows
+  2. Identify shared utility objects that if secured, would fix multiple vulnerabilities
+  3. Assess testing requirements by mapping all transactions that must be verified post-fix
+  4. Evaluate whether changes require modifications to JPA entities or Hibernate configurations
+  
+  **DELIVERABLES (MUST CREATE FILES):**
+  - Create SECURITY_VULNERABILITY_ANALYSIS.md with detailed findings from structural analysis
+  - Create REMEDIATION_STRATEGY.md with prioritized action plan based on architectural impact
+  - Create TESTING_SCOPE.md mapping all transactions and data flows requiring validation
+  
+  Leverage the structural intelligence to design solutions that minimize breaking changes 
+  while maximizing security coverage across the application architecture.

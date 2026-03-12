@@ -1,0 +1,60 @@
+# Module Architecture Refactoring Task Configuration
+# Optimize OpenMRS module initialization and dependency management
+target_repo: https://github.com/CASTResearchLabs/openmrs-core
+model: claude-sonnet-4-20250514
+config: config/adaptive_engineering.yaml
+deployment: local
+application_name: openmrs01
+
+task: |
+  The OpenMRS context initialization process exhibits massive complexity, indicating a 
+  monolithic startup pattern. Your task is to analyze the structural complexity and design 
+  a modular refactoring strategy to improve maintainability and startup performance.
+  
+  Through comprehensive code analysis and dependency tracking, conduct architectural analysis:
+  
+  **Phase 1: Monolithic Initialization Analysis**
+  1. Deep-dive into the contextInitialized method and startup workflow to understand its complexity
+  2. Map all architectural components involved: business logic services, web components, database connections
+  3. Trace dependency chains within this complex initialization process
+  4. Identify circular dependencies and tight coupling points that prevent modularization
+  
+  **Phase 2: Module Boundary Discovery**
+  1. Analyze module-related functionality (ModuleResourcesServlet, OpenmrsJspServlet, etc.)
+  2. Map Spring bean dependencies and service layer relationships across modules
+  3. Identify shared utility classes that create cross-module coupling
+  4. Trace data access patterns to understand database dependency boundaries
+  
+  **Phase 3: Startup Performance Impact Assessment**
+  1. Correlate SQL queries in loops with initialization performance bottlenecks
+  2. Analyze daemon thread patterns and background processing dependencies
+  3. Map critical path dependencies that must complete before module availability
+  4. Identify opportunities for lazy loading and asynchronous module initialization
+  
+  **Phase 4: Dependency Injection Optimization**
+  1. Analyze Spring framework usage patterns across external package dependencies
+  2. Map JPA entity interdependencies that create startup database overhead
+  3. Identify opportunities for dependency interface abstractions
+  4. Plan service layer refactoring to enable independent module lifecycle management
+  
+  **Phase 5: Refactoring Strategy Design**
+  1. Design module boundaries based on structural analysis findings
+  2. Plan phased extraction approach minimizing breaking changes to existing transactions
+  3. Identify shared infrastructure components requiring careful interface design
+  4. Map testing scope for module isolation and integration verification
+  
+  **Phase 6: Quality Improvement Assessment**
+  1. Analyze how refactoring could address existing structural flaws and performance issues
+  2. Plan improvements to error handling and reliability patterns
+  3. Design error handling patterns for independent module failure scenarios
+  4. Assess security implications of module boundary changes
+  
+  **DELIVERABLES (MUST CREATE FILES):**
+  - Create INITIALIZATION_COMPLEXITY_ANALYSIS.md with detailed structural breakdown
+  - Create MODULE_BOUNDARY_DESIGN.md defining proposed architectural separations
+  - Create REFACTORING_STRATEGY.md with phased implementation approach
+  - Create PERFORMANCE_OPTIMIZATION_PLAN.md targeting startup speed improvements
+  - Create MODULE_TESTING_FRAMEWORK.md for isolated and integration testing strategies
+  
+  Focus on structural intelligence to design a refactoring that maintains functional 
+  compatibility while dramatically improving modularity and maintainability.

@@ -26,6 +26,25 @@ agent:
       - Use appropriate tools like `str_replace_editor` to create and save files
       - When creating analysis reports or documentation, save them as actual files in the working directory
 
+      **PROGRESSIVE FILE CREATION (Prevent Shell Crashes):**
+      - **CRITICAL**: NEVER create files >2000 lines or >100KB in single str_replace_editor operation
+      - **MANDATORY**: Check content size BEFORE file creation - split if needed
+      - Create files immediately when analysis data becomes substantial (>50-100 findings)
+      - Split large outputs into focused, manageable files (~1500 lines maximum each for safety)
+      - Use multiple smaller files with index navigation instead of single large files
+      - Save intermediate results progressively rather than accumulating all data
+      - Use working files for complex mappings and dependency chains
+      - Create files as analysis progresses, not at the end
+      - **SHELL CRASH PREVENTION**: Large content = Multiple files + Index file pattern
+
+      **SHELL SAFETY ENFORCEMENT:**
+      - Before str_replace_editor create: Count lines and estimate size
+      - Content >1500 lines → SPLIT into multiple files immediately  
+      - Content >80KB → SPLIT into chunks with index file
+      - Use pattern: filename_part_1.md, filename_part_2.md, filename_INDEX.md
+      - Test file creation with small content first if uncertain
+      - NEVER attempt single-file creation for analysis reports >1000 lines
+      
       **ADAPTIVE APPROACH SELECTION:**
 
       **IMPORTANT: Check the task description first before attempting any MCP tools!**
@@ -43,6 +62,26 @@ agent:
       **Use TRADITIONAL ANALYSIS ONLY if ANY of these conditions are true:**
       - Task does NOT mention "imaging-structural MCP server" or "available as application"
       - MCP servers are not configured or accessible
+
+      ---
+
+      ## **MCP TOOL RESILIENCE AND SHELL RECOVERY**
+
+      **CAST Imaging MCP Tool Integration:**
+      When using CAST Imaging MCP tools (run_structural_search_function, get_structural_search_function_syntax, etc.):
+      - These tools can occasionally crash the shell due to complex data processing or resource exhaustion
+      - Error messages like "ERROR: Bash shell terminated unexpectedly" indicate a tool crash
+      - The system includes automatic shell restart and retry capabilities for MCP tool failures
+      - If an MCP tool repeatedly crashes, try simpler analysis approaches first or break complex queries into smaller parts
+      - Always test simple commands (like `echo "test"` or `ls`) after suspected tool crashes to verify shell health
+      - MCP tool crashes are non-fatal - the environment will recover automatically
+      - For critical analyses, consider using traditional tools as fallback if MCP tools are unstable
+
+      **Recovery Behavior:**
+      - Shell crashes from MCP tools trigger automatic restart
+      - Simple commands after crashes confirm successful recovery
+      - Failed MCP commands can be retried after restart
+      - Environment maintains full functionality after recovery
 
       ---
 
