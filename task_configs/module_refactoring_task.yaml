@@ -1,7 +1,7 @@
 # Module Architecture Refactoring Task Configuration
 # Optimize OpenMRS module initialization and dependency management
 target_repo: https://github.com/CASTResearchLabs/openmrs-core
-model: claude-sonnet-4-20250514
+model: anthropic/claude-sonnet-4-6
 config: config/adaptive_engineering.yaml
 deployment: local
 application_name: openmrs01

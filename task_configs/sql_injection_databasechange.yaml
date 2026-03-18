@@ -1,0 +1,39 @@
+# Security Analysis Task Configuration  
+# Fix SQL injection vulnerabilities in the OpenMRS databasechange package
+target_repo: https://github.com/CASTResearchLabs/openmrs-core
+model: anthropic/claude-sonnet-4-6
+config: config/adaptive_engineering.yaml
+deployment: local
+application_name: openmrs01
+
+task: |
+  The OpenMRS application has been flagged with SQL injection vulnerabilities
+  (ISO-5055 on CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection'))
+  in its database migration code.
+
+  Your task is to find and fix the vulnerabilities, scoped exclusively to the package:
+    api/src/main/java/org/openmrs/util/databasechange/
+
+  **Step 1: Identify vulnerable code**
+  Search only within the databasechange package for unsafe SQL construction patterns:
+  dynamic SQL concatenation, unsanitized inputs passed to JDBC statements, or DB-sourced
+  values chained into subsequent queries without validation.
+
+  **Step 2: Implement fixes**
+  Modify the affected source files directly to eliminate the vulnerabilities. For each fix:
+  - Use parameterized queries or identifier quoting where applicable
+  - Validate any database-sourced values before reuse in subsequent queries
+  - Do not break existing method signatures or Liquibase CustomTaskChange contracts
+
+  **Step 3: Eliminate duplication if present**
+  If multiple classes share the same vulnerable pattern (e.g. copy-paste), refactor them
+  to share a common implementation rather than fixing each independently.
+
+  **DELIVERABLE (MUST CREATE ONE FILE):**
+  - Create REMEDIATION_NOTES.md at the repository root documenting:
+    - Which class(es) and method(s) were vulnerable, with the exact vulnerable lines
+    - What each fix does and why it prevents the injection
+    - Any refactoring performed and its rationale
+
+  **Constraint:** Only modify files under `org/openmrs/util/databasechange/` and the
+  REMEDIATION_NOTES.md file. Do not analyze or touch other packages.

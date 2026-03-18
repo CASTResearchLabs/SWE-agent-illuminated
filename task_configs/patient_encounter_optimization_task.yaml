@@ -1,0 +1,39 @@
+# Patient-Encounter Performance Optimization Task Configuration
+# Optimize encounter processing while preserving patient data integrity 
+target_repo: https://github.com/CASTResearchLabs/openmrs-core
+model: anthropic/claude-sonnet-4-6
+config: config/adaptive_engineering.yaml
+deployment: local
+application_name: openmrs01
+
+task: |
+  Clinical encounter processing performance has degraded significantly, impacting patient care workflows.
+  Medical staff report delays when accessing patient encounter histories during active consultations.
+  
+  Through detailed structural analysis and cross-domain dependency mapping, optimize the system while preserving data integrity:
+  
+  **Phase 1: Performance Bottleneck Discovery & Cross-Domain Impact Assessment**
+  1. Identify slow encounter processing components centered on the `encounter` table (queries, operations, data access patterns)
+  2. Map dependencies between `encounter` table operations and `patient` table record management
+  3. Trace clinical workflows that span both `encounter` table data and `patient` table information
+  4. Assess which optimization approaches to the `encounter` table could compromise patient data consistency
+  
+  **Phase 2: Intersection-Aware Risk Analysis**
+  1. Identify shared database tables between the `patient` table records and `encounter` table processing
+  2. Map Java entity operations that modify both `patient` and `encounter` table data
+  3. Analyze clinical reporting systems dependent on `patient`-`encounter` table relationships
+  4. Determine which `encounter` table optimizations could break medical record continuity
+  
+  **Phase 3: Safe Performance Optimization Strategy**
+  1. Design `encounter` table performance improvements that preserve `patient` table record integrity
+  2. Identify shared services where optimization provides maximum benefit across `patient` and `encounter` tables
+  3. Plan testing approach for all clinical workflows affected by `encounter` table performance changes
+  4. Evaluate caching and indexing strategies based on `patient`-`encounter` table dependency analysis
+  
+  **DELIVERABLES (MUST CREATE FILES):**
+  - Create ENCOUNTER_PERFORMANCE_ANALYSIS.md with detailed bottleneck findings
+  - Create OPTIMIZATION_STRATEGY.md comparing naive vs. dependency-aware approaches
+  - Create CLINICAL_WORKFLOW_TESTING_PLAN.md mapping validation requirements
+  
+  Leverage structural intelligence to achieve 40%+ encounter performance improvement
+  while maintaining zero patient data integrity issues during optimization.

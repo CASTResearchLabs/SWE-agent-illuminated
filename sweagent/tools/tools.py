@@ -196,11 +196,37 @@ class ToolConfig(BaseModel):
 
     # todo: can some of these be moved to ToolHandler?
     def model_post_init(self, __context):
+        logger = get_logger("swea-bundle-loader", emoji="📦")
+        logger.info(f"Loading {len(self.bundles)} tool bundles...")
+        
+        # Log each bundle being loaded
+        for i, bundle in enumerate(self.bundles, 1):
+            try:
+                logger.debug(f"[{i}/{len(self.bundles)}] Loading bundle: {bundle.path}")
+                # Test bundle access to catch loading issues early
+                _ = bundle.commands  # This will trigger validation
+                tools_count = len(bundle.commands)
+                logger.debug(f"[{i}/{len(self.bundles)}] Bundle {bundle.path.name} loaded successfully ({tools_count} tools)")
+            except Exception as e:
+                logger.error(f"[{i}/{len(self.bundles)}] Failed to load bundle {bundle.path}: {e}")
+                raise
+        
         # for caching:
         commands = self.commands
+        logger.info(f"Total commands loaded: {len(commands)}")
+        
+        # Log submit tool availability specifically
+        submit_commands = [cmd for cmd in commands if cmd.name == self.submit_command]
+        if submit_commands:
+            submit_source = next((bundle.path.name for bundle in self.bundles if self.submit_command in [cmd.name for cmd in bundle.commands]), "unknown")
+            logger.info(f"Submit command '{self.submit_command}' available from bundle: {submit_source}")
+        else:
+            logger.warning(f"Submit command '{self.submit_command}' NOT FOUND in any loaded bundle!")
+            logger.debug(f"Available commands: {[cmd.name for cmd in commands]}")
         multi_line_command_endings = {
             command.name: command.end_name for command in commands if command.end_name is not None
         }
+        logger.debug(f"Multi-line commands: {list(multi_line_command_endings.keys())}")
         self.tools
 
         # assert not self.enable_bash_tool and parse_function is FunctionCallingParser or JsonParser
@@ -221,7 +247,10 @@ class ToolConfig(BaseModel):
         for command in commands:
             if command.name == self.submit_command:
                 self.submit_command_end_name = command.end_name
+                logger.info(f"Submit command successfully registered: {self.submit_command}")
                 break
+        else:
+            logger.warning(f"Submit command '{self.submit_command}' not found during registration!")
 
 
 class ToolHandler:
@@ -250,15 +279,75 @@ class ToolHandler:
     # --------------------
 
     def install(self, env: SWEEnv) -> None:
-        self._install_commands(env)
-        self.reset(env)
+        self.logger.info("Starting tool installation process")
+        try:
+            self._install_commands(env)
+            self.reset(env)
+            # Run diagnostic after successful installation
+            diagnostic_info = env.diagnose_tools()
+            self.logger.debug("Post-installation diagnostic:")
+            self.logger.debug(diagnostic_info)
+        except Exception as e:
+            self.logger.error(f"Tool installation failed: {e}")
+            # Run diagnostic even on failure to understand what went wrong
+            try:
+                diagnostic_info = env.diagnose_tools()
+                self.logger.debug("Post-failure diagnostic:")
+                self.logger.debug(diagnostic_info)
+            except:
+                pass  # Don't let diagnostic failure mask original error
+            raise
+
+    def _get_tools_path(self) -> str:
+        """Build PATH string that includes all tool directories"""
+        tool_paths = [f"/root/tools/{bundle.path.name}/bin" for bundle in self.config.bundles]
+        return ":".join(tool_paths)
 
     def reset(self, env: SWEEnv) -> None:
         self.logger.info("Resetting tools")
+        
+        # Build complete PATH including all tool directories
+        tools_path = self._get_tools_path()
         env_variables = self.config.env_variables.copy() | {
             var: os.getenv(var) for var in self.config.propagate_env_variables
         }
+        
+        # Add tools PATH to environment variables for persistence
+        current_path = env.communicate("echo $PATH", check="ignore").strip()
+        if current_path:
+            full_path = tools_path + ":" + current_path
+        else:
+            full_path = tools_path
+        env_variables["PATH"] = full_path
+        
+        self.logger.debug(f"Setting persistent PATH: {full_path}")
         env.set_env_variables(env_variables)
+        
+        # Write PATH to bashrc for persistence across shell restarts  
+        bashrc_content = env.communicate("cat /root/.bashrc 2>/dev/null || echo ''", check="ignore")
+        if f"export PATH={tools_path}" not in bashrc_content:
+            env.communicate(f'echo "export PATH={tools_path}:$PATH" >> /root/.bashrc', check="raise")
+            self.logger.debug("Added tool paths to .bashrc for persistence")
+        
+        # Handle PYTHONPATH for cross-bundle Python module imports
+        # Check if registry bundle exists and set up PYTHONPATH
+        registry_bundle = next((bundle for bundle in self.config.bundles if bundle.path.name == "registry"), None)
+        if registry_bundle:
+            pythonpath_entry = "/root/tools/registry/lib"
+            if f"export PYTHONPATH={pythonpath_entry}" not in bashrc_content:
+                env.communicate(f'echo "export PYTHONPATH={pythonpath_entry}:$PYTHONPATH" >> /root/.bashrc', check="raise")
+                self.logger.debug("Added registry lib to PYTHONPATH in .bashrc for persistence")
+                
+                # Also set PYTHONPATH for current session
+                current_pythonpath = env.communicate("echo $PYTHONPATH", check="ignore").strip()
+                if current_pythonpath:
+                    full_pythonpath = pythonpath_entry + ":" + current_pythonpath
+                else:
+                    full_pythonpath = pythonpath_entry
+                env_variables["PYTHONPATH"] = full_pythonpath
+                self.logger.debug(f"Setting current session PYTHONPATH: {full_pythonpath}")
+                env.set_env_variables(env_variables)
+        
         env.write_file("/root/.swe-agent-env", json.dumps(self.config.registry_variables))
         env.write_file("/root/state.json", "{}")
         env.communicate(" && ".join(self._reset_commands), check="raise", timeout=self.config.install_timeout)
@@ -291,25 +380,60 @@ class ToolHandler:
 
     def _install_commands(self, env: SWEEnv) -> None:
         """Make sure all commands are available in the container"""
+        self.logger.info("Installing tool bundles in container...")
         env.set_env_variables(self.config.env_variables)
         cwd = env.communicate("pwd", check="raise").strip()
         asyncio.run(self._upload_bundles(env))
-        for bundle in self.config.bundles:
+        
+        # Install each bundle with detailed logging
+        for i, bundle in enumerate(self.config.bundles, 1):
+            self.logger.info(f"[{i}/{len(self.config.bundles)}] Installing bundle: {bundle.path.name}")
             cmds = [
                 f"export PATH=/root/tools/{bundle.path.name}/bin:$PATH",
                 f"chmod +x /root/tools/{bundle.path.name}/bin/*",
             ]
             if (bundle.path / "install.sh").exists():
                 cmds.append(f"cd /root/tools/{bundle.path.name} && source install.sh")
+                self.logger.debug(f"Bundle {bundle.path.name} has install.sh script")
             cmds.append(f"chmod +x /root/tools/{bundle.path.name}/bin/*")
-            env.communicate(
-                " && ".join(cmds),
-                check="raise",
-                timeout=self.config.install_timeout,
-            )
+            
+            try:
+                env.communicate(
+                    " && ".join(cmds),
+                    check="raise",
+                    timeout=self.config.install_timeout,
+                )
+                self.logger.debug(f"Bundle {bundle.path.name} installed successfully")
+            except Exception as e:
+                self.logger.error(f"Failed to install bundle {bundle.path.name}: {e}")
+                raise
         env.communicate(f"cd {cwd}", check="raise")
+        
+        # Get the PATH after reset (which should include tool paths)
         path = env.communicate("echo $PATH", check="raise").strip()
-        asyncio.run(self._check_available_commands(env, {"PATH": path}))
+        self.logger.debug(f"Final PATH: {path}")
+        
+        # Verify tools are in PATH
+        tools_path = self._get_tools_path()
+        if not all(tool_path in path for tool_path in tools_path.split(":")):  
+            self.logger.warning(f"Some tool paths may not be in PATH. Expected: {tools_path}, Actual: {path}")
+        
+        # Check command availability with enhanced logging
+        self.logger.info("Verifying command availability...")
+        try:
+            asyncio.run(self._check_available_commands(env, {"PATH": path}))
+            self.logger.info("All commands verified as available")
+            
+            # Specifically verify submit command
+            submit_available = env.communicate(f"which {self.config.submit_command}", check="ignore")
+            if submit_available.strip():
+                self.logger.info(f"Submit command '{self.config.submit_command}' verified at: {submit_available.strip()}")
+            else:
+                self.logger.error(f"Submit command '{self.config.submit_command}' NOT FOUND in PATH after installation!")
+                
+        except Exception as e:
+            self.logger.error(f"Command verification failed: {e}")
+            raise
 
     # Getting state
     # -------------

@@ -592,6 +592,10 @@ class DefaultAgent(AbstractAgent):
 
         self._chook.on_tools_installation_started()
         self.tools.install(self._env)
+        
+        # Tool reinstallation callback removed - PATH persistence should handle tool availability after crashes
+        self.logger.debug("Tool PATH persistence should handle availability after shell crashes")
+        
         self._chook.on_setup_attempt()
         self.info = AgentInfo()
         self.info["swe_agent_hash"] = get_agent_commit_hash()

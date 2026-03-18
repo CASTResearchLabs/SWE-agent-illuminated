@@ -1,7 +1,7 @@
 # Documentation Task Configuration
 # Generate architectural overview without MCP structural analysis
 target_repo: https://github.com/CASTResearchLabs/openmrs-core
-model: claude-sonnet-4-20250514
+model: anthropic/claude-sonnet-4-6
 config: config/adaptive_engineering.yaml
 deployment: local
 application_name: openmrs01

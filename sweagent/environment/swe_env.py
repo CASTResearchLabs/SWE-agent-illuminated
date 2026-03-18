@@ -80,6 +80,7 @@ class SWEEnv:
         self.clean_multi_line_functions = lambda x: x
         self._chook = CombinedEnvHooks()
         self._shell_crashed = False  # Track when shell needs restart
+        self._initializing_shell = False  # Track when shell is being initialized
         for hook in hooks or []:
             self.add_hook(hook)
 
@@ -112,6 +113,7 @@ class SWEEnv:
         """Start the environment and reset it to a clean state."""
         self._init_deployment()
         self._shell_crashed = False  # Reset crash flag on start
+        self._initializing_shell = False  # Ensure initialization flag is reset
         self.reset()
         for command in self._post_startup_commands:
             self.communicate(command, check="raise", timeout=self.post_startup_command_timeout)
@@ -132,8 +134,10 @@ class SWEEnv:
         """Resets the environment and deployment, i.e., completely restarts the
         deployment.
         """
+        self.logger.info("Performing hard reset of environment...")
         self.close()
         self.start()
+        # Note: PATH persistence via .bashrc should maintain tool availability
 
     def reset(self):
         """Reset the environment to a clean state.
@@ -182,15 +186,65 @@ class SWEEnv:
         """Handles container initialization. Defines container name and creates it.
         If cached_image is provided, it will use that image name instead of the default.
         """
-        self._chook.on_start_deployment()
-        asyncio.run(self.deployment.start())
-        asyncio.run(
-            self.deployment.runtime.create_session(
-                CreateBashSessionRequest(startup_source=["/root/.bashrc"], startup_timeout=10)
+        self._initializing_shell = True  # Prevent crash recovery during init
+        try:
+            self._chook.on_start_deployment()
+            asyncio.run(self.deployment.start())
+            asyncio.run(
+                self.deployment.runtime.create_session(
+                    CreateBashSessionRequest(startup_source=["/root/.bashrc"], startup_timeout=10)
+                )
             )
-        )
-        self.set_env_variables({"LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PIP_PROGRESS_BAR": "off", "PAGER": "cat"})
-        self.logger.info("Environment Initialized")
+            self.set_env_variables({"LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PIP_PROGRESS_BAR": "off", "PAGER": "cat"})
+            
+            # Source bashrc to pick up any persistent PATH modifications
+            self.communicate("source /root/.bashrc 2>/dev/null || true", check="ignore", timeout=5)
+            
+            self.logger.info("Environment Initialized")
+        finally:
+            self._initializing_shell = False  # Always reset flag
+
+    def diagnose_tools(self) -> str:
+        """Diagnostic command to check tool/bundle loading status"""
+        try:
+            # Check if common tools are available
+            tools_to_check = ["submit", "_state_anthropic", "str_replace_editor", "find_file", "edit"]
+            results = {}
+            
+            for tool in tools_to_check:
+                result = self.communicate(f"which {tool}", check="ignore", timeout=5)
+                results[tool] = result.strip() if result.strip() else "NOT FOUND"
+            
+            # Check PATH
+            path = self.communicate("echo $PATH", check="ignore", timeout=5)
+            
+            # Check if tool directories exist and are in PATH
+            path_check = self.communicate("ls -la /root/tools/*/bin/ 2>/dev/null | head -10", check="ignore", timeout=5)
+            
+            # Check .bashrc for PATH modifications
+            bashrc_content = self.communicate("grep -n 'PATH.*tools' /root/.bashrc 2>/dev/null || echo 'No PATH modifications found'", check="ignore", timeout=5)
+            
+            diagnostic_output = f"""
+=== SWE-Agent Tools Diagnostic ===
+Tool Availability:
+{chr(10).join(f"  {tool}: {path}" for tool, path in results.items())}
+
+Current PATH: {path.strip()}
+
+Tool Directories in /root/tools:
+{path_check}
+
+.bashrc PATH Modifications:
+{bashrc_content}
+
+=== End Diagnostic ===
+"""
+            self.logger.info("Tools diagnostic completed")
+            return diagnostic_output
+            
+        except Exception as e:
+            self.logger.error(f"Tools diagnostic failed: {e}")
+            return f"ERROR: Tools diagnostic failed: {e}"
 
     def interrupt_session(self):
         self.logger.info("Interrupting session")
@@ -232,7 +286,12 @@ class SWEEnv:
         except pexpect.exceptions.EOF as e:
             self.logger.error("Bash shell terminated unexpectedly during command execution: %s", e)
             self.logger.error("Command that caused termination: %s", input_str)
-            self._shell_crashed = True
+            
+            # Don't set crash flag during initialization to prevent infinite loops
+            if not self._initializing_shell:
+                self._shell_crashed = True
+            else:
+                self.logger.warning("Shell crashed during initialization - will not trigger restart to prevent infinite loop")
             
             # If it's an MCP command, try to provide graceful fallback
             if self._is_mcp_command(input_str):
@@ -268,8 +327,8 @@ class SWEEnv:
         Returns:
             output: output from container
         """
-        # Check if shell crashed and restart it
-        if self._shell_crashed:
+        # Check if shell crashed and restart it (but not during initialization)
+        if self._shell_crashed and not self._initializing_shell:
             self.logger.info("Shell crashed previously. Attempting automatic restart...")
             try:
                 self.hard_reset()
@@ -318,6 +377,17 @@ class SWEEnv:
         # For commands that ran successfully, check exit code if requested
         if check != "ignore" and exit_code is not None and exit_code != 0:
             self.logger.error(f"{error_msg}:\n{output}")
+            
+            # Special handling for submit command failures
+            if "submit: command not found" in str(output) or ("submit" in input and "command not found" in str(output)):
+                self.logger.warning("Submit command failure detected - running tools diagnostic...")
+                try:
+                    diagnostic_info = self.diagnose_tools()
+                    self.logger.warning("Submit failure diagnostic:")
+                    self.logger.warning(diagnostic_info)
+                except Exception as diag_e:
+                    self.logger.error(f"Failed to run diagnostic after submit failure: {diag_e}")
+            
             msg = f"Command {input!r} failed ({exit_code=}): {error_msg}"
             self.logger.error(msg)
             if check == "raise":
@@ -361,7 +431,9 @@ class SWEEnv:
             return
         _env_setters = [f"export {k}={shlex.quote(str(v))}" for k, v in env_variables.items()]
         command = " && ".join(_env_setters)
-        self.communicate(command, check="raise")
+        # Use check="warn" instead of "raise" to avoid infinite recursion during shell restart
+        # When shell is restarting, failing to set env vars should not trigger another restart
+        self.communicate(command, check="warn")
 
     def execute_command(
         self,

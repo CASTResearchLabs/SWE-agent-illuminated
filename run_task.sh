@@ -14,6 +14,13 @@ if [ $# -lt 1 ] || [ $# -gt 2 ]; then
     echo "  target_repo: https://github.com/owner/repo"
     echo "  model: gpt-4o"
     echo "  config: config/adaptive_engineering.yaml"
+    echo "  per_instance_cost_limit: 5.0  # Optional (default: 5.0)"
+    echo "  per_instance_call_limit: 100  # Optional (default: 100)"
+    echo "  max_input_tokens: 1000000      # Optional (default: 1000000)"
+    echo "  max_output_tokens: 128000      # Optional (default: 128000)"
+    echo "  completion_kwargs:  # Optional model parameters"
+    echo "    temperature: 0.5"
+    echo "    max_tokens: 4096"
     echo "  task: |"
     echo "    Your multi-line task description here..."
     echo ""
@@ -60,6 +67,11 @@ SWE_CONFIG=$(yq eval '.config // "config/adaptive_engineering.yaml"' "$CONFIG_FI
 TASK_TEXT=$(yq eval '.task' "$CONFIG_FILE")
 DEPLOYMENT=$(yq eval '.deployment // "local"' "$CONFIG_FILE")
 APPLICATION_NAME=$(yq eval '.application_name // ""' "$CONFIG_FILE")
+COMPLETION_KWARGS=$(yq eval '.completion_kwargs // null' "$CONFIG_FILE")
+PER_INSTANCE_COST_LIMIT=$(yq eval '.per_instance_cost_limit // 5.0' "$CONFIG_FILE")
+PER_INSTANCE_CALL_LIMIT=$(yq eval '.per_instance_call_limit // 100' "$CONFIG_FILE")
+MAX_INPUT_TOKENS=$(yq eval '.max_input_tokens // 1000000' "$CONFIG_FILE")
+MAX_OUTPUT_TOKENS=$(yq eval '.max_output_tokens // 128000' "$CONFIG_FILE")
 
 # Validate required fields
 if [ "$TARGET_REPO" = "null" ] || [ -z "$TARGET_REPO" ]; then
@@ -77,9 +89,23 @@ if [ "$WITH_MCP" = true ] && ([ "$APPLICATION_NAME" = "null" ] || [ -z "$APPLICA
     exit 1
 fi
 
+# Handle completion_kwargs for Gemini models
+COMPLETION_KWARGS_ARG=""
+if [ "$COMPLETION_KWARGS" != "null" ] && [ -n "$COMPLETION_KWARGS" ]; then
+    # Use provided completion_kwargs 
+    COMPLETION_KWARGS_JSON=$(echo "$COMPLETION_KWARGS" | yq eval -o=json '.')
+    COMPLETION_KWARGS_ARG="--agent.model.completion_kwargs=$COMPLETION_KWARGS_JSON"
+    echo "🔧 Using custom completion_kwargs for non-Gemini model"
+fi
+
+# Store original task text before MCP modification
+ORIGINAL_TASK_TEXT="$TASK_TEXT"
+
 # Add MCP server text if --with-mcp is provided
+MCP_CONTEXT=""
 if [ "$WITH_MCP" = true ]; then
-    TASK_TEXT="(current code base is available as application ${APPLICATION_NAME} via imaging-structural MCP server)
+    MCP_CONTEXT="(current code base is available as application ${APPLICATION_NAME} via imaging-structural MCP server)"
+    TASK_TEXT="${MCP_CONTEXT}
 ${TASK_TEXT}"
 fi
 
@@ -89,9 +115,16 @@ echo "  Repository: $TARGET_REPO"
 echo "  Model: $MODEL"
 echo "  Config: $SWE_CONFIG"
 echo "  Deployment: $DEPLOYMENT"
+echo "  Per-instance cost limit: $PER_INSTANCE_COST_LIMIT"
+echo "  Per-instance call limit: $PER_INSTANCE_CALL_LIMIT"
+echo "  Max input tokens: $MAX_INPUT_TOKENS"
+echo "  Max output tokens: $MAX_OUTPUT_TOKENS"
 if [ "$WITH_MCP" = true ]; then
     echo "  MCP: Enabled"
     echo "  Application Name: $APPLICATION_NAME"
+fi
+if [ -n "$COMPLETION_KWARGS_ARG" ]; then
+    echo "  Completion kwargs: $(echo "$COMPLETION_KWARGS_ARG" | sed 's/--agent.model.completion_kwargs=//')"
 fi
 echo ""
 echo "📝 Task:"
@@ -131,9 +164,12 @@ if [ "$CLEANUP_NEEDED" = true ]; then
     echo "🧹 The following directories from previous runs were found:"
     echo -e "$CLEANUP_DIRS"
     echo ""
-    read -p "Clean up these directories before starting? (y/N): " -n 1 -r
+    read -p "Clean up these directories before starting? (Y/n): " -n 1 -r
     echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        echo "⏭️  Skipping cleanup"
+        echo ""
+    else
         echo "🗑️  Cleaning up..."
         
         # Clean /root/tools/* subdirectories
@@ -150,9 +186,6 @@ if [ "$CLEANUP_NEEDED" = true ]; then
         
         echo "✅ Cleanup completed"
         echo ""
-    else
-        echo "⏭️  Skipping cleanup"
-        echo ""
     fi
 fi
 
@@ -163,12 +196,48 @@ echo ""
 # Convert multiline task text to single line with \n for proper command line passing
 TASK_TEXT_SINGLE_LINE=$(echo "$TASK_TEXT" | awk '{printf "%s\\n", $0}' | sed 's/\\n$//')
 
-sweagent run \
+# Build sweagent command with optional completion_kwargs
+CMD=(sweagent run \
     --config "$SWE_CONFIG" \
     --agent.model.name "$MODEL" \
+    --agent.model.per_instance_cost_limit="$PER_INSTANCE_COST_LIMIT" \
+    --agent.model.per_instance_call_limit="$PER_INSTANCE_CALL_LIMIT" \
+    --agent.model.max_input_tokens="$MAX_INPUT_TOKENS" \
+    --agent.model.max_output_tokens="$MAX_OUTPUT_TOKENS" \
     --env.repo.github_url="$TARGET_REPO" \
     --problem_statement.text="$TASK_TEXT_SINGLE_LINE" \
-    --env.deployment.type="$DEPLOYMENT"
+    --env.deployment.type="$DEPLOYMENT")
+
+# Add completion_kwargs if present
+if [ -n "$COMPLETION_KWARGS_ARG" ]; then
+    CMD+=("$COMPLETION_KWARGS_ARG")
+fi
+
+# Display the final command for debugging
+echo "🔧 Final command to be executed:"
+echo ""
+printf "  %s" "${CMD[0]}"
+for arg in "${CMD[@]:1}"; do
+    if [[ "$arg" == --* ]]; then
+        printf " \\\\\n    %s" "$arg"
+    else
+        printf " \"%s\"" "$arg"
+    fi
+done
+echo ""
+echo ""
+
+# Final confirmation with command visible
+read -p "🚀 Execute the above command? (y/N): " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Cancelled by user"
+    exit 0
+fi
+
+# Execute the command
+echo "⚡ Starting execution..."
+"${CMD[@]}"
 
 echo ""
 echo "✅ Task execution completed!"

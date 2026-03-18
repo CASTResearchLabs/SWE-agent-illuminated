@@ -1,0 +1,39 @@
+# Medical Terminology Modernization Task Configuration
+# Modernize medical concept hierarchies while preserving patient data integrity
+target_repo: https://github.com/CASTResearchLabs/openmrs-core
+model: anthropic/claude-sonnet-4-6
+config: config/adaptive_engineering.yaml
+deployment: local
+application_name: openmrs01
+
+task: |
+  The OpenMRS medical records system requires modernization of its medical terminology infrastructure
+  to support contemporary standards while preserving existing patient care workflows.
+  
+  Through comprehensive structural analysis and dependency mapping, analyze the application architecture to:
+  
+  **Phase 1: Terminology System Discovery & Impact Assessment**
+  1. Map the complete medical concept hierarchy centered on the `concept` table and its relationships to patient records
+  2. Identify all database tables, entities, and operations involved in concept management starting from the `concept` table
+  3. Trace concept dependencies across the `patient` and `encounter` tables to clinical workflows and reporting
+  4. Assess intersection points where concept table changes could impact patient data integrity
+  
+  **Phase 2: Cross-Domain Dependency Analysis**
+  1. Map relationships between the `concept` table definitions and `patient` table record structures
+  2. Identify clinical encounter workflows dependent on specific concept hierarchies through `encounter` table analysis
+  3. Trace medical reporting systems that span `concept`, `patient`, and `encounter` table data
+  4. Analyze authentication/authorization flows that rely on concept-based permissions
+  
+  **Phase 3: Safe Modernization Strategy Planning**
+  1. Design concept migration approach that preserves patient record validity
+  2. Identify shared terminology services that could minimize disruption if modernized first
+  3. Plan testing strategy mapping all clinical workflows requiring post-migration validation
+  4. Evaluate rollback complexity based on cross-domain dependency analysis
+  
+  **DELIVERABLES (MUST CREATE FILES):**
+  - Create CONCEPT_DEPENDENCY_ANALYSIS.md with detailed structural findings
+  - Create TERMINOLOGY_MODERNIZATION_STRATEGY.md with phased implementation plan
+  - Create CLINICAL_WORKFLOW_TESTING_SCOPE.md mapping validation requirements
+  
+  Leverage architectural intelligence to design terminology modernization that maximizes
+  clinical capability improvements while minimizing disruption to active patient care.
