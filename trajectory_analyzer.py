@@ -42,6 +42,7 @@ class ActionSummary:
 
 
 @dataclass
+@dataclass
 class TrajectoryAnalysis:
     """Complete analysis of a trajectory file"""
     file_path: Path
@@ -57,23 +58,20 @@ class TrajectoryAnalysis:
     total_execution_time: float
     swe_agent_version: str
     success_ratio: float
-    success: bool
-    with_mcp: bool  # Problem statement mentions MCP server availability
-    mcp_usage: float  # Ratio of actions involving MCP operations (mcp_list_servers, mcp_list_tools, mcp_call)
-    mcp_cli_mode: bool  # Whether MCP access is via bash CLI wrappers (affects performance/syntax)
-    model: str      # Model name from replay_config
-    date: str       # File modification timestamp
+    success: bool  # Backward compatibility - True for success or success_with_warning
+    status: str  # "success", "success_with_warning", "failed"
+    with_mcp: bool  # Whether MCP server was available during execution
+    mcp_usage: str  # Description of MCP usage pattern
+    mcp_cli_mode: bool  # Whether running in MCP CLI mode
+    model: str  # Model name used for this trajectory
+    date: str  # Date of trajectory execution
 
 
 class TrajectoryAnalyzer:
-    """Analyzer for SWE-agent trajectory files"""
+    """Analyzer for SWE-agent trajectory data"""
     
-    def __init__(self):
-        self.results: List[TrajectoryAnalysis] = []
-        
     def _create_task_grouping_key(self, result: TrajectoryAnalysis) -> Tuple[str, str, str]:
-        """Create a grouping key based on normalized task statement, model, and config"""
-        # Handle None problem statement gracefully
+        """Create a grouping key from normalized task, model, and config"""
         problem_text = result.problem_statement or ""
         
         # Use first 200 chars of cleaned problem statement as task identifier
@@ -110,7 +108,7 @@ class TrajectoryAnalyzer:
                 grouped[task_key]["without_mcp"].append(result)
                 
         return dict(grouped)
-    
+
     def extract_problem_statement(self, trajectory_data: Dict) -> str:
         """Extract the problem statement from trajectory data"""
         try:
@@ -424,13 +422,22 @@ class TrajectoryAnalyzer:
             # Analyze exit status for detailed information
             exit_status_type, exit_status_details = self._analyze_exit_status(exit_status)
             
-            # Determine overall success - manual submissions or high success ratio auto-submissions
-            # But NOT auto-submissions due to format errors which indicate incomplete work
-            success = (
-                exit_status.startswith('submitted') and 
-                success_ratio >= 0.7 and
-                exit_status_type != "auto_format_errors"  # Format errors indicate premature termination
-            )
+            # Determine nuanced status based on submission, meaningful patch, and action success ratio
+            has_meaningful_patch = self._has_meaningful_patch(resulting_patch)
+            is_submitted = exit_status.startswith('submitted')
+            no_format_errors = exit_status_type != "auto_format_errors"
+            high_success_ratio = success_ratio >= 0.7
+            medium_success_ratio = success_ratio >= 0.5  # Lower threshold for warning status
+            
+            if is_submitted and has_meaningful_patch and high_success_ratio and no_format_errors:
+                status = "success"
+                success = True
+            elif is_submitted and has_meaningful_patch and medium_success_ratio and no_format_errors:
+                status = "success_with_warning"
+                success = True  # For backward compatibility in calculations
+            else:
+                status = "failed"
+                success = False
             
             # Detect MCP usage (use raw problem statement for detection)
             with_mcp = self._detect_mcp_availability(raw_problem_statement)
@@ -456,6 +463,7 @@ class TrajectoryAnalyzer:
                 swe_agent_version=swe_agent_version,
                 success_ratio=success_ratio,
                 success=success,
+                status=status,
                 with_mcp=with_mcp,
                 mcp_usage=mcp_usage,
                 mcp_cli_mode=mcp_cli_mode,
@@ -535,7 +543,7 @@ class TrajectoryAnalyzer:
             
             # Write header
             writer.writerow([
-                'trajectory_id', 'mcp_context', 'success', 'success_ratio', 'exit_status', 'exit_status_type', 'exit_status_details', 
+                'trajectory_id', 'mcp_context', 'success', 'status', 'success_ratio', 'exit_status', 'exit_status_type', 'exit_status_details', 
                 'total_execution_time', 'num_actions', 'instance_cost', 'tokens_sent', 'tokens_received',
                 'api_calls', 'swe_agent_version', 'has_patch', 'with_mcp', 'mcp_usage', 'mcp_cli_mode',
                 'model', 'date'
@@ -547,6 +555,7 @@ class TrajectoryAnalyzer:
                     result.trajectory_id,
                     result.mcp_context,
                     result.success,
+                    result.status,
                     f"{result.success_ratio:.3f}",
                     result.exit_status,
                     result.exit_status_type,
@@ -766,7 +775,7 @@ class TrajectoryAnalyzer:
                     f.write(f"**Detailed report:** {split_file_path}\n\n")
 
                 # Status badges using emoji
-                status_emoji = "✅" if result.success else "❌"
+                status_emoji = self._get_status_emoji(result.status)
                 mcp_emoji = "🔌" if result.with_mcp else "⚫"
                 patch_emoji = "📝" if self._has_meaningful_patch(result.resulting_patch) else "📄"
                 cli_emoji = "🖥️" if result.mcp_cli_mode else ""
@@ -1006,7 +1015,7 @@ class TrajectoryAnalyzer:
                 f.write(f"**Date:** {result.date}\n\n")
 
                 # Status badges using emoji
-                status_emoji = "✅" if result.success else "❌"
+                status_emoji = self._get_status_emoji(result.status)
                 mcp_emoji = "🔌" if result.with_mcp else "⚫"
                 patch_emoji = "📝" if self._has_meaningful_patch(result.resulting_patch) else "📄"
                 
@@ -1222,10 +1231,10 @@ class TrajectoryAnalyzer:
     
     def _write_trajectory_summary(self, f, result: TrajectoryAnalysis):
         """Write brief trajectory summary for detailed view"""
-        success_emoji = "✅" if result.success else "❌"
+        status_emoji = self._get_status_emoji(result.status)
         patch_emoji = "📝" if self._has_meaningful_patch(result.resulting_patch) else "📄"
         
-        f.write(f"**{result.trajectory_id}** {success_emoji} | {patch_emoji} | ")
+        f.write(f"**{result.trajectory_id}** {status_emoji} | {patch_emoji} | ")
         f.write(f"{result.success_ratio:.0%} success | {result.total_execution_time:.0f}s | ")
         f.write(f"${result.model_stats.instance_cost:.2f}\n\n")
     
@@ -1234,7 +1243,7 @@ class TrajectoryAnalyzer:
         f.write(f"##### {index}. Trajectory: `{result.trajectory_id}`\n\n")
         
         # Status badges using emoji
-        status_emoji = "✅" if result.success else "❌"
+        status_emoji = self._get_status_emoji(result.status)
         mcp_emoji = "🔌" if result.with_mcp else "⚫"
         patch_emoji = "📝" if self._has_meaningful_patch(result.resulting_patch) else "📄"
         cli_emoji = "🖥️" if result.mcp_cli_mode else ""
@@ -1283,6 +1292,15 @@ class TrajectoryAnalyzer:
             f.write(f"\n**📄 Detailed Analysis:** See `{safe_id}.md`\n")
         
         f.write("\n")
+    
+    def _get_status_emoji(self, status: str) -> str:
+        """Get emoji for trajectory status"""
+        if status == "success":
+            return "✅"
+        elif status == "success_with_warning":
+            return "⚠️"
+        else:
+            return "❌"
     
     def _create_task_hash(self, normalized_task: str) -> str:
         """Create a short hash identifier for a task"""

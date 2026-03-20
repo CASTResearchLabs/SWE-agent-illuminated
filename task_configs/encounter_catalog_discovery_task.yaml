@@ -23,10 +23,64 @@ task: |
   ## Call Graph Inventory
   
   For each code element found, provide:
+
   - **File path** (relative to project root)
   - **Code element** (class, method, function, query, etc.)
-  - **Connection type** (directly accesses encounter table, calls code that does, called by code that does)
-  
+  - **Connection type** (directly accesses encounter table | immediate caller | transitive caller | AOP/framework interceptor)
+  - **Connection proof**: the single direct edge that connects this element to the
+    next step toward the `encounter` table, in the form:
+
+      `<this_file>::<this_element>` --[edge_type]--> `<next_file>::<next_element>`
+
+    For direct accessors the next step IS the encounter table:
+      `HibernateEncounterDAO.java::getEncounter(Integer)` --[SQL]--> `encounter table`
+
+    For callers, the next step is the called element:
+      `EncounterServiceImpl.java::saveEncounter(Encounter)` --[CALL]--> `HibernateEncounterDAO.java::saveEncounter(Encounter)`
+
+    Full paths are reconstructible by following rows in CALL_EDGES.md.
+    Do not inline the full chain here — one hop is sufficient as proof of direct connectivity.
+
+  Edge type examples (use the closest match; add new labels as needed):
+  CALL | JPA-MAP | FK | SQL | INTERCEPTS | IMPLEMENTS
+
+  Rules:
+  - One row per direct edge (do not skip intermediate hops).
+  - If A calls B which calls C, produce two rows: (A→B) and (B→C).
+
+  Examples of how to represent common patterns:
+  - A method calling another method → edge type CALL;
+    "To Element" is the called method signature.
+  - An ORM field annotation creating a database join (e.g. @ManyToOne, @JoinColumn)
+    → edge type JPA-MAP; "To Element" is the mapped column (e.g. encounter.encounter_id).
+  - A raw or embedded query string (SQL, HQL, JPQL, Criteria)
+    → edge type SQL; "To Element" is the target table and operation (e.g. encounter / SELECT).
+  - An AOP or framework interceptor wrapping a service call
+    → edge type INTERCEPTS; "To Element" is the intercepted method.
+
+  **Expected Output: CALL_EDGES.md**
+
+  A flat, machine-readable edge list of every direct call relationship found.
+  This is the raw material from which CATALOG.md connection proofs are derived.
+
+  Group rows by (From File, To File) pair. Format:
+
+  | From File | From Element | Edge Type | To File | To Element |
+  |-----------|--------------|-----------|---------|------------|
+
+  Edge type values: CALL | JPA-MAP | FK | SQL | INTERCEPTS | IMPLEMENTS
+
+  Rules:
+  - One row per **direct** edge (do not skip intermediate hops).
+  - If A calls B which calls C, produce two rows: (A→B) and (B→C).
+  - For JPA @ManyToOne / @OneToMany field mappings, the "To Element" is the column
+    name in the target table (e.g., `encounter.encounter_id`).
+  - For native SQL / HQL / JPQL, the "From Element" is the method containing the
+    query; the "To Element" is the table and operation (e.g., `encounter / SELECT`).
+
+  This file makes it possible to independently verify any connection proof in
+  CATALOG.md by walking the edge list from the claimed element to `encounter`.
+
   **Discovery Strategy:**
   
   Start from encounter table access points and trace the complete call graph:
@@ -39,4 +93,11 @@ task: |
   6. **Scheduled jobs/triggers**: Find background processes that may access encounter table
   7. **Event handlers**: Find code that responds to encounter-related events
   
-  **Important:** Focus on execution connectivity, not conceptual relationships. Include code even if it doesn't mention "encounter" but can be reached through method calls from encounter table access points.
+  **Important:** Focus on execution connectivity, not textual proximity.
+  - Do NOT include a code element solely because it contains the string "encounter" in its source.
+    Every entry in CATALOG.md must have a populated **Connection proof** chain traceable
+    through rows in CALL_EDGES.md.
+  - Code that is connected but does not mention "encounter" (e.g., a utility method called
+    transitively from HibernateEncounterDAO) MUST be included if it appears in the call graph.
+    Its CALL_EDGES.md rows will show the path even though the element itself contains no
+    encounter-domain terms.
