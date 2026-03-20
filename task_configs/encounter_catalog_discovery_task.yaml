@@ -1,0 +1,42 @@
+# Encounter Code Catalog Discovery Task
+# Task: Generate a comprehensive file catalog for encounter table business logic analysis
+target_repo: https://github.com/CASTResearchLabs/openmrs-core
+model: anthropic/claude-sonnet-4-6
+per_instance_cost_limit: 10.0
+per_instance_call_limit: 500
+config: config/adaptive_engineering.yaml
+deployment: local
+application_name: openmrs01
+
+task: |
+  **TASK: ENCOUNTER TABLE CALL GRAPH CATALOG**
+  
+  **Objective:** Generate an exhaustive catalog of ALL code elements that are connected to the `encounter` table through direct or indirect call paths. This catalog maps the complete call graph to identify every code element that can potentially interact with the encounter table during execution.
+  
+  **Background:**
+  To understand the full impact scope of encounter table changes, we need to trace all execution paths that can lead to or from the encounter table - not just code that mentions "encounter" but code that is actually connected through the call graph.
+  
+  **Expected Output: CATALOG.md**
+  
+  Create a comprehensive list of ALL files and code elements in the call graph:
+  
+  ## Call Graph Inventory
+  
+  For each code element found, provide:
+  - **File path** (relative to project root)
+  - **Code element** (class, method, function, query, etc.)
+  - **Connection type** (directly accesses encounter table, calls code that does, called by code that does)
+  
+  **Discovery Strategy:**
+  
+  Start from encounter table access points and trace the complete call graph:
+  
+  1. **Direct table access**: Find all SQL queries, DAO methods, repository calls that directly read/write encounter table
+  2. **Immediate callers**: Find all methods/functions that call the direct access code
+  3. **Transitive callers**: Continue tracing upward to find everything that calls the immediate callers
+  4. **Downstream calls**: From direct access points, trace what other tables/services they call
+  5. **API entry points**: Trace from public APIs down to encounter table access
+  6. **Scheduled jobs/triggers**: Find background processes that may access encounter table
+  7. **Event handlers**: Find code that responds to encounter-related events
+  
+  **Important:** Focus on execution connectivity, not conceptual relationships. Include code even if it doesn't mention "encounter" but can be reached through method calls from encounter table access points.
