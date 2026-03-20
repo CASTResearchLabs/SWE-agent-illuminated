@@ -1,0 +1,75 @@
+# Database Schema Impact Analysis Task Configuration  
+# Analyze the impact of adding a new column to the encounter table in OpenMRS
+target_repo: https://github.com/CASTResearchLabs/openmrs-core
+model: anthropic/claude-sonnet-4-6
+per_instance_cost_limit: 10.0
+per_instance_call_limit: 500
+config: config/adaptive_engineering.yaml
+deployment: local
+application_name: openmrs01
+
+task: |
+  Your task is to conduct a comprehensive impact analysis for a proposed database schema change: 
+  **adding a new column 'severity_level' (VARCHAR(50)) to the 'encounter' table** in the OpenMRS system.
+  
+  This analysis will help determine the scope of code changes needed and identify potential risks 
+  before implementing this database modification.
+
+  **Schema Change Details:**
+  - Table: `encounter` 
+  - New Column: `severity_level` VARCHAR(50) NULL
+  - Purpose: Track encounter severity classification (e.g., "low", "medium", "high", "critical")
+
+  **ANALYSIS PHASES:**
+
+  **Phase 1: Database Entity Analysis**
+  1. Identify the encounter table structure and its current relationships
+  2. Map database entities that reference or are referenced by the encounter table
+  3. Understand the data flow patterns involving encounter data
+  4. Assess the size and complexity of encounter-related data graphs
+
+  **Phase 2: Code Object Impact Assessment** 
+  1. Find all code objects (classes, methods, interfaces) that interact with encounter table
+  2. Identify the core Encounter entity/model class and its properties
+  3. Map data access objects (DAOs), repositories, or services managing encounter data
+  4. Locate encounter-related business logic and validation components
+
+  **Phase 3: API and UI Endpoint Analysis**
+  1. Identify all API endpoints (REST, web services) that read/write encounter data
+  2. Find UI components, forms, or pages that display or edit encounter information  
+  3. Map the call graphs from UI/API endpoints down to database operations
+  4. Assess which endpoints might need updates to support the new field
+
+  **Phase 4: Dependency and Coupling Analysis**
+  1. Analyze inbound dependencies - what code calls encounter-related functionality
+  2. Analyze outbound dependencies - what functionality encounter code depends on
+  3. Find shared utilities or components that might be affected by encounter changes
+  4. Identify potential circular dependencies in encounter-related code
+
+  **Phase 5: Integration and Testing Scope**
+  1. Map all transactions (business flows) that involve encounter processing
+  2. Identify integration points with external systems or modules
+  3. Assess testing scope - which transactions need testing after the change
+  4. Find existing test classes and test methods related to encounter functionality
+
+  **Phase 6: Change Impact Summary and Recommendations**
+  1. Prioritize code changes needed (required vs. optional)
+  2. Identify high-risk areas where changes might break existing functionality
+  3. Recommend implementation strategy to minimize breaking changes
+  4. Suggest testing approach and rollback considerations
+
+  **DELIVERABLES (MUST CREATE FILES):**
+  - **ENCOUNTER_ENTITY_ANALYSIS.md** - Database relationships and data flow patterns
+  - **CODE_IMPACT_ASSESSMENT.md** - All code objects affected by the schema change
+  - **API_UI_ENDPOINTS_IMPACT.md** - API endpoints and UI components requiring updates  
+  - **DEPENDENCY_COUPLING_ANALYSIS.md** - Inbound/outbound dependencies and coupling points
+  - **TESTING_SCOPE_ANALYSIS.md** - Transactions and test cases affected
+  - **IMPLEMENTATION_STRATEGY.md** - Recommended approach and risk mitigation
+
+  **SUCCESS CRITERIA:**
+  Your analysis should provide a clear understanding of:
+  - How many and which specific code files need modification
+  - Which API endpoints and UI components are affected 
+  - What business processes/transactions involve encounter data
+  - The testing scope and potential integration risks
+  - A step-by-step implementation plan that minimizes disruption

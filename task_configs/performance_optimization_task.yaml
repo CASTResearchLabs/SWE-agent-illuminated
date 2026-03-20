@@ -2,6 +2,8 @@
 # Eliminate SQL queries in loops for OpenMRS performance enhancement
 target_repo: https://github.com/CASTResearchLabs/openmrs-core
 model: anthropic/claude-sonnet-4-6
+per_instance_cost_limit: 10.0
+per_instance_call_limit: 500
 config: config/adaptive_engineering.yaml
 deployment: local
 application_name: openmrs01
@@ -38,9 +40,11 @@ task: |
   4. Assess impact on Spring beans and service layer architecture
   
   **DELIVERABLES (MUST CREATE FILES):**
-  - Create PERFORMANCE_HOTSPOT_ANALYSIS.md with detailed structural findings
-  - Create OPTIMIZATION_STRATEGY.md with prioritized performance improvements
-  - Create BATCH_PROCESSING_PLAN.md detailing database operation consolidation opportunities
-  - Create TESTING_PERFORMANCE.md mapping critical transactions requiring performance validation  
+  - Save intermediate findings in markup files in <repository directory>/ if needed
+  - Create and SAVE <repository directory>/PERFORMANCE_HOTSPOT_ANALYSIS.md with detailed structural findings
+  - Create and SAVE <repository directory>/OPTIMIZATION_STRATEGY.md with prioritized performance improvements
+  - Create and SAVE <repository directory>/BATCH_PROCESSING_PLAN.md detailing database operation consolidation opportunities
+  - Create and SAVE <repository directory>/TESTING_PERFORMANCE.md mapping critical transactions requiring performance validation  
+
   Focus on solutions that leverage the existing Spring/Hibernate architecture while 
   maximizing performance gains through minimal architectural disruption.

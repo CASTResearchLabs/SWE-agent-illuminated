@@ -2,6 +2,8 @@
 # Modernize medical concept hierarchies while preserving patient data integrity
 target_repo: https://github.com/CASTResearchLabs/openmrs-core
 model: anthropic/claude-sonnet-4-6
+per_instance_cost_limit: 10.0
+per_instance_call_limit: 500
 config: config/adaptive_engineering.yaml
 deployment: local
 application_name: openmrs01
@@ -31,9 +33,10 @@ task: |
   4. Evaluate rollback complexity based on cross-domain dependency analysis
   
   **DELIVERABLES (MUST CREATE FILES):**
-  - Create CONCEPT_DEPENDENCY_ANALYSIS.md with detailed structural findings
-  - Create TERMINOLOGY_MODERNIZATION_STRATEGY.md with phased implementation plan
-  - Create CLINICAL_WORKFLOW_TESTING_SCOPE.md mapping validation requirements
+  - Save intermediate findings in markup files in <repository directory>/ if needed
+  - Create and SAVE <repository directory>/CONCEPT_DEPENDENCY_ANALYSIS.md with detailed structural findings
+  - Create and SAVE <repository directory>/TERMINOLOGY_MODERNIZATION_STRATEGY.md with phased implementation plan
+  - Create and SAVE <repository directory>/CLINICAL_WORKFLOW_TESTING_SCOPE.md mapping validation requirements
   
   Leverage architectural intelligence to design terminology modernization that maximizes
   clinical capability improvements while minimizing disruption to active patient care.

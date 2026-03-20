@@ -2,6 +2,8 @@
 # Assess and prepare remediation plan for SQL injection vulnerabilities in OpenMRS
 target_repo: https://github.com/CASTResearchLabs/openmrs-core
 model: anthropic/claude-sonnet-4-6
+per_instance_cost_limit: 10.0
+per_instance_call_limit: 500
 config: config/adaptive_engineering.yaml
 deployment: local
 application_name: openmrs01
@@ -31,9 +33,10 @@ task: |
   4. Evaluate whether changes require modifications to JPA entities or Hibernate configurations
   
   **DELIVERABLES (MUST CREATE FILES):**
-  - Create SECURITY_VULNERABILITY_ANALYSIS.md with detailed findings from structural analysis
-  - Create REMEDIATION_STRATEGY.md with prioritized action plan based on architectural impact
-  - Create TESTING_SCOPE.md mapping all transactions and data flows requiring validation
+  - Save intermediate findings in markup files in <repository directory>/ if needed
+  - Create and SAVE <repository directory>/SECURITY_VULNERABILITY_ANALYSIS.md with detailed findings from structural analysis
+  - Create and SAVE <repository directory>/REMEDIATION_STRATEGY.md with prioritized action plan based on architectural impact
+  - Create and SAVE <repository directory>/TESTING_SCOPE.md mapping all transactions and data flows requiring validation
   
   Leverage the structural intelligence to design solutions that minimize breaking changes 
   while maximizing security coverage across the application architecture.

@@ -211,3 +211,6 @@ trajectories_sft/
 
 # VENV
 venv_mcp_test/
+
+# trajectory_analyses
+trajectory_analyses/

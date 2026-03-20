@@ -2,6 +2,8 @@
 # Optimize database access patterns and JPA entity relationships in OpenMRS
 target_repo: https://github.com/CASTResearchLabs/openmrs-core
 model: anthropic/claude-sonnet-4-6
+per_instance_cost_limit: 10.0
+per_instance_call_limit: 500
 config: config/adaptive_engineering.yaml
 deployment: local
 application_name: openmrs01
@@ -56,12 +58,13 @@ task: |
   4. Map connection pooling optimization opportunities
   
   **DELIVERABLES (MUST CREATE FILES):**
-  - Create DATABASE_ARCHITECTURE_ANALYSIS.md with complete data flow mapping
-  - Create JPA_OPTIMIZATION_STRATEGY.md detailing entity relationship improvements
-  - Create PERFORMANCE_TUNING_PLAN.md targeting database operation efficiency
-  - Create CACHING_STRATEGY.md with intelligent cache layer design
-  - Create DATA_SECURITY_ARCHITECTURE.md addressing secure data access patterns
-  - Create SCALABILITY_ROADMAP.md for future data growth management
+  - Save intermediate findings in markup files in <repository directory>/ directory if needed
+  - Create and SAVE <repository directory>/DATABASE_ARCHITECTURE_ANALYSIS.md with complete data flow mapping
+  - Create and SAVE <repository directory>/JPA_OPTIMIZATION_STRATEGY.md detailing entity relationship improvements
+  - Create and SAVE <repository directory>/PERFORMANCE_TUNING_PLAN.md targeting database operation efficiency
+  - Create and SAVE <repository directory>/CACHING_STRATEGY.md with intelligent cache layer design
+  - Create and SAVE <repository directory>/DATA_SECURITY_ARCHITECTURE.md addressing secure data access patterns
+  - Create and SAVE <repository directory>/SCALABILITY_ROADMAP.md for future data growth management
   
   Leverage structural intelligence to design data architecture optimizations that improve 
   performance while maintaining the complex clinical data relationships essential to OpenMRS functionality.

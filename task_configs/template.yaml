@@ -1,7 +1,7 @@
 # Example: Custom Task Configuration Template
 # Copy and modify this template for your own tasks
 target_repo: https://github.com/your-org/your-repo
-model: anthropic/claude-sonnet-4-6                                    # or claude-3-5-sonnet-20241022
+model: gemini/gemini-2.0-flash                                    # or claude-3-5-sonnet-20241022
 config: config/adaptive_engineering.yaml        # or config/advanced_engineering.yaml
 deployment: local                                # or modal
 application_name: appname
@@ -31,3 +31,7 @@ task: |
   - Legacy system modernization planning
   - Quality assessment and improvement
   - Microservice extraction analysis
+
+  **DELIVERABLES (MUST CREATE FILES):**
+  - Save intermediate findings in markup files in <repository directory>/ if needed
+  - Create and SAVE <repository directory>/****.md with detailed findings from ****

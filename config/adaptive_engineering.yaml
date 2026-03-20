@@ -4,6 +4,8 @@
 actions:
   apply_patch_locally: false
 agent:
+  # Increased retry limit for MCP tool stability
+  max_requeries: 8  # Increased from default 3 to handle MCP tool failures
   model:
 #     litellm_model_registry: "my_model_registry.json"
     top_p: null
@@ -75,29 +77,62 @@ agent:
 
       **CAST Imaging MCP Tool Integration:**
       When using CAST Imaging MCP tools (run_structural_search_function, get_structural_search_function_syntax, etc.):
+      
+      **PREVENT SHELL CRASHES WITH PAGINATION:**
+      - **MANDATORY**: Use pagination parameters for large datasets to prevent shell crashes
+      - **quality_insights function**: ALWAYS set `items_per_page: 20` (default 100 causes 53KB+ responses → crashes)
+      - **Large data functions**: Use `items_per_page: 30-50` for functions returning lists (advisors, objects, transactions)
+      - **Progressive data retrieval**: Fetch data in pages, process incrementally, save intermediate results
+      - **Response size limit**: Avoid responses >10KB to maintain shell stability
+      - **Example safe calls:**
+        ```
+        quality_insights(application="myapp", nature="iso-5055", items_per_page=20)
+        transactions(application="myapp", page=1, items_per_page=30)
+        objects(application="myapp", items_per_page=40)
+        ```
+      
+      **ERROR RECOVERY AND RESILIENCE:**
       - These tools can occasionally crash the shell due to complex data processing or resource exhaustion
       - Error messages like "ERROR: Bash shell terminated unexpectedly" indicate a tool crash
       - The system includes automatic shell restart and retry capabilities for MCP tool failures
-      - If an MCP tool repeatedly crashes, try simpler analysis approaches first or break complex queries into smaller parts
-      - Always test simple commands (like `echo "test"` or `ls`) after suspected tool crashes to verify shell health
+      - **CRITICAL ERROR RECOVERY**: If you encounter repeated format/blocklist/bash syntax errors from MCP tools:
+        1. Immediately verify shell health with simple commands (`echo "test"`, `ls`)
+        2. If shell is unresponsive, wait for automatic restart
+        3. Resume with simpler MCP queries or reduced complexity
+        4. Save intermediate results frequently to preserve progress
+        5. If MCP tools remain unstable, switch to traditional analysis as fallback
+      - Break complex MCP queries into smaller parts to avoid resource exhaustion
+      - Always test simple commands after suspected tool crashes to verify shell health
       - MCP tool crashes are non-fatal - the environment will recover automatically
-      - For critical analyses, consider using traditional tools as fallback if MCP tools are unstable
+      - **PROGRESSIVE DATA SAVING**: Save analysis results immediately after each successful MCP call to prevent data loss
+      - **GRACEFUL DEGRADATION**: Switch to traditional grep/find analysis if MCP failures exceed 3 consecutive attempts
 
       **Recovery Behavior:**
       - Shell crashes from MCP tools trigger automatic restart
       - Simple commands after crashes confirm successful recovery
       - Failed MCP commands can be retried after restart
       - Environment maintains full functionality after recovery
+      - **RETRY STRATEGY**: Max retry limit increased to 8 for MCP tool stability
+      - **FALLBACK MECHANISM**: Auto-switch to traditional analysis if MCP tools fail repeatedly
+      - **DATA PRESERVATION**: Save partial results before attempting complex MCP operations
 
       ---
 
       ## **APPROACH A: LAYERED ANALYSIS (Structural + Traditional)**
 
-      **PHASE 1: Structural Discovery (MCP)**
-      1. Verify MCP connectivity with `mcp_list_servers` and `mcp_list_tools`
-      2. Verify application availability using the `applications` function
-      3. Get architectural overview: `stats`, `architectural_graph`, `transactions`,
-        `data_graphs`, `quality_insights`
+      **PHASE 1: Structural Discovery (MCP) - WITH RESILIENCE**
+      1. **PRE-FLIGHT CHECK**: Verify MCP connectivity with `mcp_list_servers` and `mcp_list_tools`
+      2. **SIMPLE START**: Begin with basic `applications` function to test stability
+      3. **PROGRESSIVE ANALYSIS**: Get architectural overview incrementally:
+         - Start with `stats` (safest, smallest data)
+         - Then `architectural_graph` (moderate complexity)
+         - **CRITICAL**: Use `quality_insights` with `items_per_page=20` to prevent 53KB+ responses that crash shells
+         - Example: `quality_insights(application="myapp", nature="iso-5055", items_per_page=20)`
+         - For large datasets, use pagination: `transactions(items_per_page=30)`, `objects(items_per_page=40)`
+         - Save results immediately after each successful call
+         - Continue with remaining functions only if previous calls succeed
+      4. **ERROR MONITORING**: If any MCP call fails, immediately save current progress and assess stability
+      5. **FALLBACK TRIGGER**: If 3+ MCP calls fail consecutively, switch to traditional analysis
       4. Use `object_details` for modification targets (inward/outward/testing focus)
       5. Use `graph_intersection_analysis` to understand architectural coupling
 
@@ -283,5 +318,7 @@ agent:
 
           Your adaptive approach demonstrates sophisticated engineering judgment, automatically leveraging the best available tools while maintaining professional development standards regardless of the analysis method used.
   history_processors:
+    # - type: default
+    # disabling to support gemini models  
     - type: cache_control
       last_n_messages: 2

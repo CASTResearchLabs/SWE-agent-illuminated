@@ -162,6 +162,8 @@ class SWEEnv:
             startup_commands = [
                 f"cd /{self.repo.repo_name}",
                 "export ROOT=$(pwd -P)",
+                # Persist ROOT in .bashrc for shell restart survival
+                'echo "export ROOT=$(pwd -P)" >> /root/.bashrc',
                 *self.repo.get_reset_commands(),
             ]
             self.communicate(
@@ -171,6 +173,22 @@ class SWEEnv:
                 # Sometimes this is slow because it rebuilds some index
                 timeout=120,
             )
+            
+            # Update registry with ROOT path for tools that depend on it  
+            repo_path = f"/{self.repo.repo_name}"
+            try:
+                # Read existing registry
+                registry_content = self.read_file("/root/.swe-agent-env", encoding="utf-8")
+                import json  
+                registry_data = json.loads(registry_content)
+                registry_data["ROOT"] = repo_path
+                # Write back updated registry
+                self.write_file("/root/.swe-agent-env", json.dumps(registry_data))
+            except Exception as e:
+                self.logger.debug(f"Could not update registry with ROOT: {e}")
+                # Create minimal registry if it doesn't exist
+                import json
+                self.write_file("/root/.swe-agent-env", json.dumps({"ROOT": repo_path}))
 
     def close(self) -> None:
         """Shutdown SWE-ReX deployment etc."""

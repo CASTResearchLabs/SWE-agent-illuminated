@@ -2,6 +2,8 @@
 # Fix SQL injection vulnerabilities in the OpenMRS databasechange package
 target_repo: https://github.com/CASTResearchLabs/openmrs-core
 model: anthropic/claude-sonnet-4-6
+per_instance_cost_limit: 10.0
+per_instance_call_limit: 500
 config: config/adaptive_engineering.yaml
 deployment: local
 application_name: openmrs01
@@ -11,7 +13,7 @@ task: |
   (ISO-5055 on CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection'))
   in its database migration code.
 
-  Your task is to find and fix the vulnerabilities, scoped exclusively to the package:
+  Your task is to fix these vulnerabilities, scoped exclusively to the package:
     api/src/main/java/org/openmrs/util/databasechange/
 
   **Step 1: Identify vulnerable code**
@@ -29,8 +31,9 @@ task: |
   If multiple classes share the same vulnerable pattern (e.g. copy-paste), refactor them
   to share a common implementation rather than fixing each independently.
 
-  **DELIVERABLE (MUST CREATE ONE FILE):**
-  - Create REMEDIATION_NOTES.md at the repository root documenting:
+  **DELIVERABLE (MUST CREATE FILES):**
+  - Save intermediate findings in markup files in <repository directory>/ if needed
+  - Create and SAVE <repository directory>/REMEDIATION_NOTES.md:
     - Which class(es) and method(s) were vulnerable, with the exact vulnerable lines
     - What each fix does and why it prevents the injection
     - Any refactoring performed and its rationale

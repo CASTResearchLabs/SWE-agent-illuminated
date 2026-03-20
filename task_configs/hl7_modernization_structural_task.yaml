@@ -2,6 +2,8 @@
 # Comprehensive structural analysis for HL7 system replacement in OpenMRS
 target_repo: https://github.com/CASTResearchLabs/openmrs-core
 model: anthropic/claude-sonnet-4-6
+per_instance_cost_limit: 10.0
+per_instance_call_limit: 500
 config: config/adaptive_engineering.yaml
 deployment: local
 application_name: openmrs01
@@ -44,11 +46,12 @@ task: |
   4. Plan validation strategies for message transformation accuracy
   
   **DELIVERABLES (MUST CREATE FILES):**
-  - Create HL7_STRUCTURAL_ANALYSIS.md with complete component mapping and dependencies
-  - Create MIGRATION_IMPACT_ASSESSMENT.md detailing architectural implications
-  - Create REPLACEMENT_STRATEGY.md with phased implementation plan
-  - Create INTEGRATION_TESTING_SCOPE.md mapping all affected transactions and data flows
-  - Create BACKWARD_COMPATIBILITY_PLAN.md addressing legacy HL7 message handling
+  - Save intermediate findings in markup files in <repository directory>/ if needed
+  - Create and SAVE <repository directory>/HL7_STRUCTURAL_ANALYSIS.md with complete component mapping and dependencies
+  - Create and SAVE <repository directory>/MIGRATION_IMPACT_ASSESSMENT.md detailing architectural implications
+  - Create and SAVE <repository directory>/REPLACEMENT_STRATEGY.md with phased implementation plan
+  - Create and SAVE <repository directory>/INTEGRATION_TESTING_SCOPE.md mapping all affected transactions and data flows
+  - Create and SAVE <repository directory>/BACKWARD_COMPATIBILITY_PLAN.md addressing legacy HL7 message handling
   
   Emphasize preparation over implementation - use structural intelligence to design a 
   migration strategy that minimizes risk and maximizes compatibility with existing OpenMRS workflows.

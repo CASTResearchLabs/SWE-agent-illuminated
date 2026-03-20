@@ -2,6 +2,8 @@
 # Identify HL7 components for modernization without MCP structural analysis
 target_repo: https://github.com/CASTResearchLabs/openmrs-core
 model: anthropic/claude-sonnet-4-6
+per_instance_cost_limit: 10.0
+per_instance_call_limit: 500
 config: config/adaptive_engineering.yaml
 deployment: local
 application_name: openmrs01
@@ -14,7 +16,7 @@ task: |
   4/ the data entities to monitor for integrity
   
   **DELIVERABLES (MUST CREATE FILES):**
-  - Save intermediate findings in markup files if needed
-  - CREATE and SAVE the final report in a file named HL7_MODERNIZATION.md 
+  - Save intermediate findings in markup files in <repository directory>/ if needed
+  - CREATE and SAVE the final report in a file named and SAVE <repository directory>/HL7_MODERNIZATION.md 
   
   Be as specific and detailed as possible in the files you create.

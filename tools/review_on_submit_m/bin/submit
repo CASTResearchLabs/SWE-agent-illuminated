@@ -16,7 +16,30 @@ def main() -> None:
     args = parser.parse_args()
 
     repo_root = registry.get("ROOT", os.getenv("ROOT"))
-    assert repo_root
+    
+    # Fallback strategy if ROOT is not properly initialized
+    if not repo_root:
+        # Try to find git repository in common locations
+        possible_roots = ["/workspace", os.getcwd()]
+        # Look for any directory that's not /root and contains .git
+        try:
+            for path in Path("/").iterdir():
+                if path.is_dir() and path.name not in ("root", "tmp", "var", "etc", "usr", "bin", "sbin", "lib", "lib64", "opt", "proc", "sys", "dev", "run"):
+                    if (path / ".git").exists():
+                        possible_roots.append(str(path))
+        except PermissionError:
+            pass
+        
+        for candidate in possible_roots:
+            if candidate and Path(candidate).exists() and (Path(candidate) / ".git").exists():
+                repo_root = candidate
+                # Update registry for future use
+                registry["ROOT"] = repo_root
+                break
+        
+        if not repo_root:
+            print("ERROR: Could not find repository root. Environment may need reset.")
+            sys.exit(1)
 
     patch_path = Path("/root/model.patch")
 

@@ -2,38 +2,64 @@
 # Optimize encounter processing while preserving patient data integrity 
 target_repo: https://github.com/CASTResearchLabs/openmrs-core
 model: anthropic/claude-sonnet-4-6
+per_instance_cost_limit: 10.0
+per_instance_call_limit: 500
 config: config/adaptive_engineering.yaml
 deployment: local
 application_name: openmrs01
 
 task: |
-  Clinical encounter processing performance has degraded significantly, impacting patient care workflows.
-  Medical staff report delays when accessing patient encounter histories during active consultations.
-  
-  Through detailed structural analysis and cross-domain dependency mapping, optimize the system while preserving data integrity:
-  
-  **Phase 1: Performance Bottleneck Discovery & Cross-Domain Impact Assessment**
-  1. Identify slow encounter processing components centered on the `encounter` table (queries, operations, data access patterns)
-  2. Map dependencies between `encounter` table operations and `patient` table record management
-  3. Trace clinical workflows that span both `encounter` table data and `patient` table information
-  4. Assess which optimization approaches to the `encounter` table could compromise patient data consistency
-  
-  **Phase 2: Intersection-Aware Risk Analysis**
-  1. Identify shared database tables between the `patient` table records and `encounter` table processing
-  2. Map Java entity operations that modify both `patient` and `encounter` table data
-  3. Analyze clinical reporting systems dependent on `patient`-`encounter` table relationships
-  4. Determine which `encounter` table optimizations could break medical record continuity
-  
-  **Phase 3: Safe Performance Optimization Strategy**
-  1. Design `encounter` table performance improvements that preserve `patient` table record integrity
-  2. Identify shared services where optimization provides maximum benefit across `patient` and `encounter` tables
-  3. Plan testing approach for all clinical workflows affected by `encounter` table performance changes
-  4. Evaluate caching and indexing strategies based on `patient`-`encounter` table dependency analysis
-  
+  **PERFORMANCE ISSUE:** 
+  Clinical staff report that encounter record retrieval has become unacceptably slow, 
+  especially when viewing patient encounter histories. Initial investigation suggests 
+  performance bottlenecks in encounter-related database operations and API endpoints.
+
+  **OPTIMIZATION OBJECTIVE:**
+  Use structural analysis to identify root causes of encounter performance issues and 
+  design targeted optimizations that improve response times while preserving data integrity.
+
+  **ANALYSIS APPROACH:**
+
+  **Phase 1: Performance Bottleneck Discovery**
+  1. Identify encounter-related database operations and assess their complexity
+  2. Map all API endpoints and transactions that retrieve or process encounter data
+  3. Analyze encounter-related call graphs to find computational hotspots
+  4. Assess encounter table data access patterns and potential SQL performance issues
+
+  **Phase 2: Cross-Entity Impact Analysis**  
+  1. Examine patient-encounter relationships and shared database operations
+  2. Identify code objects used by both patient and encounter processing workflows
+  3. Map transaction intersections between patient management and encounter handling
+  4. Assess which optimizations might affect patient data consistency or workflows
+
+  **Phase 3: Code Quality and Structural Issues**
+  1. Identify encounter-related code with high complexity or performance anti-patterns
+  2. Find quality issues (SQL in loops, inefficient queries, excessive object creation)
+  3. Analyze coupling between encounter processing and other system components
+  4. Assess architectural patterns that contribute to performance degradation
+
+  **Phase 4: Optimization Strategy Design**
+  1. Prioritize performance improvements by impact and implementation complexity
+  2. Design caching strategies for frequently accessed encounter data
+  3. Identify database indexing opportunities and query optimization targets  
+  4. Plan refactoring approach that minimizes disruption to clinical workflows
+
+  **Phase 5: Testing and Validation Scope**
+  1. Map all transactions requiring performance testing after optimization
+  2. Identify critical patient care workflows that must be regression tested
+  3. Define performance benchmarks and success criteria
+  4. Plan rollout strategy with fallback procedures for clinical environments
+
   **DELIVERABLES (MUST CREATE FILES):**
-  - Create ENCOUNTER_PERFORMANCE_ANALYSIS.md with detailed bottleneck findings
-  - Create OPTIMIZATION_STRATEGY.md comparing naive vs. dependency-aware approaches
-  - Create CLINICAL_WORKFLOW_TESTING_PLAN.md mapping validation requirements
-  
-  Leverage structural intelligence to achieve 40%+ encounter performance improvement
-  while maintaining zero patient data integrity issues during optimization.
+  - **ENCOUNTER_PERFORMANCE_BOTTLENECKS.md** - Root cause analysis of slow operations
+  - **CROSS_ENTITY_DEPENDENCY_ANALYSIS.md** - Patient-encounter relationship impacts  
+  - **CODE_QUALITY_ISSUES.md** - Structural problems contributing to poor performance
+  - **OPTIMIZATION_STRATEGY.md** - Prioritized performance improvement plan
+  - **PERFORMANCE_TESTING_SCOPE.md** - Testing requirements for clinical workflow validation
+
+  **SUCCESS METRICS:**
+  - Identify specific code files, methods, and database operations causing slowdowns
+  - Quantify encounter-related transaction complexity and call graph depth
+  - Map precise coupling points between patient and encounter processing
+  - Deliver actionable optimization plan with measurable performance targets
+

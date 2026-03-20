@@ -12,9 +12,11 @@ Extracts key information from SWE-agent trajectory files including:
 import json
 import os
 import re
+import hashlib
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, asdict
+from collections import defaultdict
 import argparse
 
 
@@ -50,12 +52,15 @@ class TrajectoryAnalysis:
     model_stats: ModelStats
     actions: List[ActionSummary]
     exit_status: str
+    exit_status_type: str  # "manual_submission", "auto_format_errors", "auto_other", "unknown" 
+    exit_status_details: str  # Additional context about submission type
     total_execution_time: float
     swe_agent_version: str
     success_ratio: float
     success: bool
     with_mcp: bool  # Problem statement mentions MCP server availability
     mcp_usage: float  # Ratio of actions involving MCP operations (mcp_list_servers, mcp_list_tools, mcp_call)
+    mcp_cli_mode: bool  # Whether MCP access is via bash CLI wrappers (affects performance/syntax)
     model: str      # Model name from replay_config
     date: str       # File modification timestamp
 
@@ -65,6 +70,46 @@ class TrajectoryAnalyzer:
     
     def __init__(self):
         self.results: List[TrajectoryAnalysis] = []
+        
+    def _create_task_grouping_key(self, result: TrajectoryAnalysis) -> Tuple[str, str, str]:
+        """Create a grouping key based on normalized task statement, model, and config"""
+        # Handle None problem statement gracefully
+        problem_text = result.problem_statement or ""
+        
+        # Use first 200 chars of cleaned problem statement as task identifier
+        normalized_task = problem_text[:200].strip().replace('\n', ' ') if problem_text else "Unknown Task"
+        
+        # Extract config from file path or use default
+        config = "unknown"
+        try:
+            # Look for config pattern in file path
+            path_str = str(result.file_path)
+            if "adaptive_engineering" in path_str:
+                config = "adaptive_engineering"
+            elif "default" in path_str:
+                config = "default"
+            else:
+                config = "unknown"
+        except:
+            config = "unknown"
+            
+        # Handle None model gracefully
+        model = result.model or "unknown"
+            
+        return (normalized_task, model, config)
+    
+    def group_trajectories_by_task(self, results: List[TrajectoryAnalysis]) -> Dict[Tuple[str, str, str], Dict[str, List[TrajectoryAnalysis]]]:
+        """Group trajectories by normalized task + model + config, then by MCP usage"""
+        grouped = defaultdict(lambda: {"with_mcp": [], "without_mcp": []})
+        
+        for result in results:
+            task_key = self._create_task_grouping_key(result)
+            if result.with_mcp:
+                grouped[task_key]["with_mcp"].append(result)
+            else:
+                grouped[task_key]["without_mcp"].append(result)
+                
+        return dict(grouped)
     
     def extract_problem_statement(self, trajectory_data: Dict) -> str:
         """Extract the problem statement from trajectory data"""
@@ -86,12 +131,17 @@ class TrajectoryAnalyzer:
                                                 start = text.find('<task_description>') + len('<task_description>')
                                                 end = text.find('</task_description>')
                                                 if end != -1:
-                                                    return text[start:end].strip()
+                                                    extracted = text[start:end].strip()
+                                                    # Process escaped newlines and clean up
+                                                    extracted = extracted.replace('\\n', '\n')
+                                                    return extracted
                                             # Fallback: return first substantial user content
                                             if len(text.strip()) > 100:
-                                                return text.strip()[:1000] + "..." if len(text) > 1000 else text.strip()
+                                                processed_text = text.replace('\\n', '\n')
+                                                return processed_text.strip()[:1000] + "..." if len(processed_text) > 1000 else processed_text.strip()
                                 elif isinstance(content, str) and len(content.strip()) > 100:
-                                    return content.strip()[:1000] + "..." if len(content) > 1000 else content.strip()
+                                    processed_content = content.replace('\\n', '\n')
+                                    return processed_content.strip()[:1000] + "..." if len(processed_content) > 1000 else processed_content.strip()
             return "Problem statement not found"
         except Exception as e:
             return f"Error extracting problem statement: {str(e)}"
@@ -198,12 +248,17 @@ class TrajectoryAnalyzer:
         if not problem_statement:
             return ""
         
-        # Look for MCP context pattern at the beginning
-        pattern = r'^\s*\([^)]*via [^)]*MCP server\)'
+        # Look for MCP context pattern - make it more flexible
+        patterns = [
+            r'^\s*\([^)]*via [^)]*MCP server\)',  # Original pattern
+            r'^\s*\(current code base is available as application [^)]*via [^)]*MCP server\)'  # More specific pattern
+        ]
+        
         import re
-        match = re.search(pattern, problem_statement, re.IGNORECASE)
-        if match:
-            return match.group(0).strip()
+        for pattern in patterns:
+            match = re.search(pattern, problem_statement, re.IGNORECASE | re.MULTILINE)
+            if match:
+                return match.group(0).strip()
         return ""
     
     def _clean_problem_statement(self, problem_statement: str, mcp_context: str) -> str:
@@ -228,10 +283,72 @@ class TrajectoryAnalyzer:
         if not problem_statement:
             return False
         
-        # Check if problem statement starts with MCP availability pattern
-        pattern = r'^\s*\(current code base is available as application .* via imaging-structural MCP server\)'
+        # Check multiple patterns for MCP availability
+        patterns = [
+            r'\(current code base is available as application .* via imaging-structural MCP server\)',
+            r'\([^)]*via [^)]*imaging-structural MCP server\)',
+            r'\([^)]*via [^)]*MCP server\)',  # More general fallback
+        ]
+        
         import re
-        return bool(re.search(pattern, problem_statement, re.IGNORECASE))
+        for pattern in patterns:
+            if re.search(pattern, problem_statement, re.IGNORECASE | re.MULTILINE):
+                return True
+        
+        return False
+    
+    def _analyze_exit_status(self, exit_status: str) -> tuple[str, str]:
+        """Analyze exit status to determine type and provide detailed context"""
+        status = exit_status.lower()
+        
+        if status == "submitted":
+            return "manual_submission", "Normal successful manual submission"
+        elif "exit_format" in status:
+            return "auto_format_errors", "Auto-submitted due to repeated format/blocklist/bash syntax errors (likely MCP tool instability)"
+        elif "autosubmitted" in status or "auto" in status:
+            return "auto_other", "Auto-submitted due to other system constraints (timeout, cost, etc.)"
+        elif status.startswith("submitted"):
+            # Handle any other "submitted (...)" variants
+            details = status.replace("submitted", "").strip("() ")
+            return "auto_other", f"Auto-submitted due to: {details}"
+        else:
+            return "unknown", f"Non-submission exit: {exit_status}"
+    
+    def _detect_mcp_cli_mode(self, actions: List[ActionSummary]) -> bool:
+        """Detect if MCP access is via bash CLI wrappers (Princeton SWE-agent setup)"""
+        # Look for patterns that indicate bash CLI wrapper usage for MCP
+        mcp_action_count = 0
+        cli_wrapper_indicators = 0
+        
+        for action in actions:
+            if (action.action.startswith('mcp_call') or 
+                action.action.startswith('mcp_list')):
+                mcp_action_count += 1
+                
+                # Check for bash CLI wrapper patterns
+                action_text = action.action.lower()
+                if any(indicator in action_text for indicator in [
+                    'bash', 'shell', 'echo', 'curl', 'python -c', 'subprocess', 'os.system'
+                ]):
+                    cli_wrapper_indicators += 1
+        
+        # If we have MCP actions and signs of CLI wrappers, likely using CLI mode
+        return mcp_action_count > 0 and (cli_wrapper_indicators > 0 or mcp_action_count >= 3)
+        
+        for action in actions:
+            if (action.action.startswith('mcp_call') or 
+                action.action.startswith('mcp_list')):
+                mcp_action_count += 1
+                
+                # Check for bash CLI wrapper patterns
+                action_text = action.action.lower()
+                if any(indicator in action_text for indicator in [
+                    'bash', 'shell', 'echo', 'curl', 'python -c', 'subprocess', 'os.system'
+                ]):
+                    cli_wrapper_indicators += 1
+        
+        # If we have MCP actions and signs of CLI wrappers, likely using CLI mode
+        return mcp_action_count > 0 and (cli_wrapper_indicators > 0 or mcp_action_count >= 3)
     
     def _calculate_mcp_usage(self, actions: List[ActionSummary]) -> float:
         """Calculate the ratio of actions involving MCP operations"""
@@ -304,12 +421,21 @@ class TrajectoryAnalyzer:
             else:
                 success_ratio = 0.0
             
-            # Determine overall success (submitted + reasonable success ratio >= 0.7)
-            success = exit_status == 'submitted' and success_ratio >= 0.7
+            # Analyze exit status for detailed information
+            exit_status_type, exit_status_details = self._analyze_exit_status(exit_status)
+            
+            # Determine overall success - manual submissions or high success ratio auto-submissions
+            # But NOT auto-submissions due to format errors which indicate incomplete work
+            success = (
+                exit_status.startswith('submitted') and 
+                success_ratio >= 0.7 and
+                exit_status_type != "auto_format_errors"  # Format errors indicate premature termination
+            )
             
             # Detect MCP usage (use raw problem statement for detection)
             with_mcp = self._detect_mcp_availability(raw_problem_statement)
             mcp_usage = self._calculate_mcp_usage(actions)
+            mcp_cli_mode = self._detect_mcp_cli_mode(actions)
             
             # Extract model and date information
             model = self._extract_model_name(trajectory_data)
@@ -324,12 +450,15 @@ class TrajectoryAnalyzer:
                 model_stats=model_stats,
                 actions=actions,
                 exit_status=exit_status,
+                exit_status_type=exit_status_type,
+                exit_status_details=exit_status_details,
                 total_execution_time=total_execution_time,
                 swe_agent_version=swe_agent_version,
                 success_ratio=success_ratio,
                 success=success,
                 with_mcp=with_mcp,
                 mcp_usage=mcp_usage,
+                mcp_cli_mode=mcp_cli_mode,
                 model=model,
                 date=date
             )
@@ -406,9 +535,9 @@ class TrajectoryAnalyzer:
             
             # Write header
             writer.writerow([
-                'trajectory_id', 'mcp_context', 'success', 'success_ratio', 'exit_status', 'total_execution_time',
-                'num_actions', 'instance_cost', 'tokens_sent', 'tokens_received',
-                'api_calls', 'swe_agent_version', 'has_patch', 'with_mcp', 'mcp_usage',
+                'trajectory_id', 'mcp_context', 'success', 'success_ratio', 'exit_status', 'exit_status_type', 'exit_status_details', 
+                'total_execution_time', 'num_actions', 'instance_cost', 'tokens_sent', 'tokens_received',
+                'api_calls', 'swe_agent_version', 'has_patch', 'with_mcp', 'mcp_usage', 'mcp_cli_mode',
                 'model', 'date'
             ])
             
@@ -420,6 +549,8 @@ class TrajectoryAnalyzer:
                     result.success,
                     f"{result.success_ratio:.3f}",
                     result.exit_status,
+                    result.exit_status_type,
+                    result.exit_status_details,
                     result.total_execution_time,
                     len(result.actions),
                     result.model_stats.instance_cost,
@@ -430,6 +561,7 @@ class TrajectoryAnalyzer:
                     len(result.resulting_patch or "") > 10,
                     result.with_mcp,
                     f"{result.mcp_usage:.3f}",
+                    result.mcp_cli_mode,
                     result.model,
                     result.date
                 ])
@@ -485,7 +617,8 @@ class TrajectoryAnalyzer:
         return clean_token.lower() if clean_token else 'unknown'
     
     def export_to_markdown(self, results: List[TrajectoryAnalysis], output_path: Path, 
-                          detailed: bool = False, include_patches: bool = True, simplified_for_split: bool = False):
+                          detailed: bool = False, include_patches: bool = True, simplified_for_split: bool = False,
+                          group_by_task: bool = True):
         """Export analysis to Markdown format optimized for LLM judge analysis"""
         
         def escape_markdown(text: str) -> str:
@@ -559,21 +692,48 @@ class TrajectoryAnalyzer:
             f.write(f"**Generated:** {self._get_current_timestamp()}\n\n")
             f.write(f"**Total Trajectories:** {len(results)}\n\n")
             
+            # Group trajectories by task if requested and we have multiple trajectories
+            if group_by_task and len(results) > 1:
+                self._export_grouped_analysis(f, results, detailed, include_patches, simplified_for_split)
+                return
+            
             # Summary statistics
             successful = sum(1 for r in results if r.success)
-            submitted = sum(1 for r in results if r.exit_status == 'submitted')
+            submitted = sum(1 for r in results if r.exit_status.startswith('submitted'))
+            manual_submissions = sum(1 for r in results if r.exit_status_type == 'manual_submission')
+            auto_format_errors = sum(1 for r in results if r.exit_status_type == 'auto_format_errors')
+            auto_other = sum(1 for r in results if r.exit_status_type == 'auto_other')
             with_patches = sum(1 for r in results if self._has_meaningful_patch(r.resulting_patch))
             with_mcp = sum(1 for r in results if r.with_mcp)
             used_mcp = sum(1 for r in results if r.mcp_usage > 0)
+            mcp_cli_mode = sum(1 for r in results if r.mcp_cli_mode)
             
             f.write("## 📊 Executive Summary\n\n")
             f.write("| Metric | Count | Percentage |\n")
             f.write("|--------|-------|------------|\n")
-            f.write(f"| Successful (submitted + ≥70% actions) | {successful} | {successful/len(results)*100:.1f}% |\n")
+            f.write(f"| Successful (submitted + ≥70% actions, no format errors) | {successful} | {successful/len(results)*100:.1f}% |\n")
             f.write(f"| Submitted trajectories | {submitted} | {submitted/len(results)*100:.1f}% |\n")
+            f.write(f"| └─ Manual submissions | {manual_submissions} | {manual_submissions/len(results)*100:.1f}% |\n")
+            f.write(f"| └─ Auto-submitted (format/syntax errors) | {auto_format_errors} | {auto_format_errors/len(results)*100:.1f}% |\n")
+            f.write(f"| └─ Auto-submitted (other constraints) | {auto_other} | {auto_other/len(results)*100:.1f}% |\n")
             f.write(f"| With meaningful patches | {with_patches} | {with_patches/len(results)*100:.1f}% |\n")
             f.write(f"| MCP available | {with_mcp} | {with_mcp/len(results)*100:.1f}% |\n")
-            f.write(f"| Actually used MCP | {used_mcp} | {used_mcp/len(results)*100:.1f}% |\n\n")
+            f.write(f"| Actually used MCP | {used_mcp} | {used_mcp/len(results)*100:.1f}% |\n")
+            f.write(f"| MCP via bash CLI wrappers | {mcp_cli_mode} | {mcp_cli_mode/len(results)*100:.1f}% |\n\n")
+            
+            # Add MCP CLI context explanation
+            if mcp_cli_mode > 0:
+                f.write("### 🔧 MCP CLI Context\n\n")
+                f.write(f"**{mcp_cli_mode}** trajectories used MCP via bash CLI wrappers, which is characteristic of the Princeton SWE-agent setup. ")
+                f.write("This approach provides MCP access to non-MCP-aware SWE-agent installations through command-line interfaces, but may introduce:\n")
+                f.write("- Additional syntax complexity (bash escaping, JSON formatting)\n")
+                f.write("- Increased execution time due to shell process overhead\n")
+                f.write("- Higher potential for format/syntax errors leading to auto-submission\n")
+                f.write("- Tool instability as bash wrappers are more fragile than native MCP integration\n\n")
+                
+                if auto_format_errors > 0:
+                    f.write(f"**Note:** {auto_format_errors} trajectories auto-submitted due to format/syntax errors, ")
+                    f.write("which often correlates with MCP CLI wrapper instability.\n\n")
             
             # Cost and performance summary
             total_cost = sum(r.model_stats.instance_cost for r in results)
@@ -609,21 +769,41 @@ class TrajectoryAnalyzer:
                 status_emoji = "✅" if result.success else "❌"
                 mcp_emoji = "🔌" if result.with_mcp else "⚫"
                 patch_emoji = "📝" if self._has_meaningful_patch(result.resulting_patch) else "📄"
+                cli_emoji = "🖥️" if result.mcp_cli_mode else ""
                 
-                f.write(f"{status_emoji} **Status:** {result.exit_status} ")
+                # Enhanced exit status display
+                exit_status_display = result.exit_status
+                if result.exit_status_type == "auto_format_errors":
+                    exit_status_display += " ⚠️ (format errors)"
+                elif result.exit_status_type == "auto_other":
+                    exit_status_display += " 🤖 (auto)"
+                elif result.exit_status_type == "manual_submission":
+                    exit_status_display += " ✋ (manual)"
+                
+                f.write(f"{status_emoji} **Status:** {exit_status_display} ")
                 f.write(f"| {mcp_emoji} **MCP:** {'Available' if result.with_mcp else 'Not Available'} ")
+                if result.mcp_cli_mode:
+                    f.write(f"{cli_emoji} (CLI) ")
                 f.write(f"| {patch_emoji} **Patch:** {'Generated' if self._has_meaningful_patch(result.resulting_patch) else 'Empty'}\n\n")
+                
+                # Exit status explanation for format errors
+                if result.exit_status_type == "auto_format_errors":
+                    f.write("⚠️ **Auto-Submission Context:** ")
+                    f.write(f"{escape_markdown(result.exit_status_details)}\n\n")
                 
                 # Key metrics table
                 f.write("#### 📈 Key Metrics\n\n")
                 f.write("| Metric | Value |\n")
                 f.write("|--------|-------|\n")
                 f.write(f"| Model | {result.model} |\n")
+                f.write(f"| Exit Status Type | {result.exit_status_type.replace('_', ' ').title()} |\n")
                 f.write(f"| Success Ratio | {result.success_ratio:.1%} ({sum(1 for a in result.actions if a.success)}/{len(result.actions)} actions) |\n")
                 f.write(f"| Execution Time | {result.total_execution_time:.1f} seconds |\n")
                 f.write(f"| Cost | ${result.model_stats.instance_cost:.2f} |\n")
                 f.write(f"| Tokens | {result.model_stats.tokens_sent:,} sent → {result.model_stats.tokens_received:,} received |\n")
                 f.write(f"| MCP Usage | {result.mcp_usage:.1%} of actions |\n")
+                if result.mcp_cli_mode:
+                    f.write(f"| MCP Access Mode | Bash CLI Wrappers (may affect performance/syntax) |\n")
                 f.write(f"| Date | {result.date.split('T')[0] if 'T' in result.date else result.date} |\n\n")
                 
                 # MCP Context (if applicable)
@@ -802,7 +982,21 @@ class TrajectoryAnalyzer:
         for result in results:
             # Create filename from trajectory ID (sanitize for filesystem)
             safe_trajectory_id = "".join(c for c in result.trajectory_id if c.isalnum() or c in "._-")
-            output_file = output_dir / f"{safe_trajectory_id}.md"
+            
+            # When in detailed mode, organize by task hash
+            if detailed:
+                # Get task grouping key and create task hash
+                task_key = self._create_task_grouping_key(result)
+                normalized_task, model, config = task_key
+                task_hash = self._create_task_hash(normalized_task)
+                
+                # Create subdirectory for this task hash
+                task_dir = output_dir / task_hash
+                task_dir.mkdir(parents=True, exist_ok=True)
+                
+                output_file = task_dir / f"{safe_trajectory_id}.md"
+            else:
+                output_file = output_dir / f"{safe_trajectory_id}.md"
             
             with open(output_file, 'w', encoding='utf-8') as f:
                 # Write individual trajectory analysis
@@ -912,6 +1106,267 @@ class TrajectoryAnalyzer:
 
         print(f"Exported {len(results)} individual trajectory analyses to directory: {output_dir}")
     
+    def _export_grouped_analysis(self, f, results: List[TrajectoryAnalysis], detailed: bool, include_patches: bool, simplified_for_split: bool):
+        """Export grouped analysis showing MCP vs non-MCP comparison for each task"""
+        grouped = self.group_trajectories_by_task(results)
+        
+        # Overall summary statistics
+        total_results = len(results)
+        successful = sum(1 for r in results if r.success)
+        with_mcp = sum(1 for r in results if r.with_mcp)
+        used_mcp = sum(1 for r in results if r.mcp_usage > 0)
+        
+        f.write("## 📊 Executive Summary\n\n")
+        f.write(f"- **Total Trajectories:** {total_results}\n")
+        f.write(f"- **Unique Tasks:** {len(grouped)}\n")
+        f.write(f"- **Overall Success Rate:** {successful/total_results*100:.1f}%\n")
+        f.write(f"- **MCP Available:** {with_mcp} trajectories ({with_mcp/total_results*100:.1f}%)\n")
+        f.write(f"- **Actually Used MCP:** {used_mcp} trajectories ({used_mcp/total_results*100:.1f}%)\n\n")
+        
+        f.write("---\n\n")
+        
+        # Individual task group analyses
+        f.write("## 📋 Task-by-Task Analysis\n\n")
+        
+        for i, (task_key, task_results) in enumerate(grouped.items(), 1):
+            normalized_task, model, config = task_key
+            with_mcp_results = task_results["with_mcp"]
+            without_mcp_results = task_results["without_mcp"]
+            
+            # Create short hash for this task
+            task_hash = self._create_task_hash(normalized_task)
+            
+            f.write(f"### {i}. Task Group: {task_hash} + {model} + {config}\n\n")
+            
+            # Task description
+            f.write("#### 🎯 Task Description\n\n")
+            f.write(f"```text\n{normalized_task}...\n```\n\n")
+            
+            # Comparison table
+            f.write("#### 📊 MCP Impact Comparison\n\n")
+            
+            self._write_comparison_table(f, with_mcp_results, without_mcp_results)
+            
+            # Always include trajectory details within each task group
+            all_task_results = with_mcp_results + without_mcp_results
+            if all_task_results:
+                f.write(f"#### 📋 Trajectory Details\n\n")
+                
+                for j, result in enumerate(all_task_results, 1):
+                    self._write_detailed_trajectory(f, result, j, detailed, include_patches, simplified_for_split)
+            
+            f.write("---\n\n")
+        
+        # LLM Analysis section
+        f.write("## 🤖 LLM Judge Analysis\n\n")
+        f.write("**Task-specific MCP impact assessment:** *[To be filled by LLM judge]*\n\n")
+        f.write("**Cross-task performance patterns:** *[To be filled by LLM judge]*\n\n")
+        f.write("**Conclusions and recommendations:** *[To be filled by LLM judge]*\n")
+    
+    def _write_comparison_table(self, f, with_mcp_results: List[TrajectoryAnalysis], without_mcp_results: List[TrajectoryAnalysis]):
+        """Write comparison table for MCP vs non-MCP results"""
+        def calculate_metrics(results: List[TrajectoryAnalysis]):
+            if not results:
+                return {
+                    'count': 0, 'success_rate': 0, 'avg_success_ratio': 0, 'avg_time': 0, 
+                    'avg_cost': 0, 'avg_actions': 0, 'patch_rate': 0, 'avg_mcp_usage': 0
+                }
+            
+            return {
+                'count': len(results),
+                'success_rate': sum(1 for r in results if r.success) / len(results) * 100,
+                'avg_success_ratio': sum(r.success_ratio for r in results) / len(results) * 100,
+                'avg_time': sum(r.total_execution_time for r in results) / len(results),
+                'avg_cost': sum(r.model_stats.instance_cost for r in results) / len(results),
+                'avg_actions': sum(len(r.actions) for r in results) / len(results),
+                'patch_rate': sum(1 for r in results if self._has_meaningful_patch(r.resulting_patch)) / len(results) * 100,
+                'avg_mcp_usage': sum(r.mcp_usage for r in results) / len(results) * 100
+            }
+        
+        mcp_metrics = calculate_metrics(with_mcp_results)
+        no_mcp_metrics = calculate_metrics(without_mcp_results)
+        
+        f.write("| Metric | With MCP | Without MCP | Difference |\n")
+        f.write("|--------|----------|-------------|------------|\n")
+        f.write(f"| Trajectories | {mcp_metrics['count']} | {no_mcp_metrics['count']} | - |\n")
+        
+        if mcp_metrics['count'] > 0 or no_mcp_metrics['count'] > 0:
+            success_diff = mcp_metrics['success_rate'] - no_mcp_metrics['success_rate']
+            success_arrow = "🔺" if success_diff > 5 else "🔻" if success_diff < -5 else "➡️"
+            f.write(f"| Success Rate | {mcp_metrics['success_rate']:.1f}% | {no_mcp_metrics['success_rate']:.1f}% | {success_arrow} {success_diff:+.1f}% |\n")
+            
+            ratio_diff = mcp_metrics['avg_success_ratio'] - no_mcp_metrics['avg_success_ratio']
+            ratio_arrow = "🔺" if ratio_diff > 5 else "🔻" if ratio_diff < -5 else "➡️"
+            f.write(f"| Avg Success Ratio | {mcp_metrics['avg_success_ratio']:.1f}% | {no_mcp_metrics['avg_success_ratio']:.1f}% | {ratio_arrow} {ratio_diff:+.1f}% |\n")
+            
+            time_diff = mcp_metrics['avg_time'] - no_mcp_metrics['avg_time']
+            time_arrow = "🔻" if time_diff > 30 else "🔺" if time_diff < -30 else "➡️"
+            f.write(f"| Avg Execution Time | {mcp_metrics['avg_time']:.0f}s | {no_mcp_metrics['avg_time']:.0f}s | {time_arrow} {time_diff:+.0f}s |\n")
+            
+            cost_diff = mcp_metrics['avg_cost'] - no_mcp_metrics['avg_cost']
+            cost_arrow = "🔻" if cost_diff > 0.5 else "🔺" if cost_diff < -0.5 else "➡️"
+            f.write(f"| Avg Cost | ${mcp_metrics['avg_cost']:.2f} | ${no_mcp_metrics['avg_cost']:.2f} | {cost_arrow} ${cost_diff:+.2f} |\n")
+            
+            actions_diff = mcp_metrics['avg_actions'] - no_mcp_metrics['avg_actions']
+            actions_arrow = "🔻" if actions_diff > 10 else "🔺" if actions_diff < -10 else "➡️"
+            f.write(f"| Avg Actions | {mcp_metrics['avg_actions']:.1f} | {no_mcp_metrics['avg_actions']:.1f} | {actions_arrow} {actions_diff:+.1f} |\n")
+            
+            patch_diff = mcp_metrics['patch_rate'] - no_mcp_metrics['patch_rate']
+            patch_arrow = "🔺" if patch_diff > 10 else "🔻" if patch_diff < -10 else "➡️"
+            f.write(f"| Patch Generation Rate | {mcp_metrics['patch_rate']:.1f}% | {no_mcp_metrics['patch_rate']:.1f}% | {patch_arrow} {patch_diff:+.1f}% |\n")
+            
+            if mcp_metrics['count'] > 0:
+                f.write(f"| MCP Usage Rate | {mcp_metrics['avg_mcp_usage']:.1f}% | 0.0% | +{mcp_metrics['avg_mcp_usage']:.1f}% |\n")
+        
+        f.write("\n")
+    
+    def _write_trajectory_summary(self, f, result: TrajectoryAnalysis):
+        """Write brief trajectory summary for detailed view"""
+        success_emoji = "✅" if result.success else "❌"
+        patch_emoji = "📝" if self._has_meaningful_patch(result.resulting_patch) else "📄"
+        
+        f.write(f"**{result.trajectory_id}** {success_emoji} | {patch_emoji} | ")
+        f.write(f"{result.success_ratio:.0%} success | {result.total_execution_time:.0f}s | ")
+        f.write(f"${result.model_stats.instance_cost:.2f}\n\n")
+    
+    def _write_detailed_trajectory(self, f, result: TrajectoryAnalysis, index: int, detailed: bool, include_patches: bool, simplified_for_split: bool):
+        """Write detailed trajectory information within task groups"""
+        f.write(f"##### {index}. Trajectory: `{result.trajectory_id}`\n\n")
+        
+        # Status badges using emoji
+        status_emoji = "✅" if result.success else "❌"
+        mcp_emoji = "🔌" if result.with_mcp else "⚫"
+        patch_emoji = "📝" if self._has_meaningful_patch(result.resulting_patch) else "📄"
+        cli_emoji = "🖥️" if result.mcp_cli_mode else ""
+        
+        # Enhanced exit status display
+        exit_status_display = result.exit_status
+        if result.exit_status_type == "auto_format_errors":
+            exit_status_display += " ⚠️ (format errors)"
+        elif result.exit_status_type == "auto_other":
+            exit_status_display += " 🤖 (auto)"
+        elif result.exit_status_type == "manual_submission":
+            exit_status_display += " ✋ (manual)"
+        
+        f.write(f"{status_emoji} **Status:** {exit_status_display} ")
+        f.write(f"| {mcp_emoji} **MCP:** {'Available' if result.with_mcp else 'Not Available'} ")
+        if result.mcp_cli_mode:
+            f.write(f"{cli_emoji} (CLI) ")
+        f.write(f"| {patch_emoji} **Patch:** {'Generated' if self._has_meaningful_patch(result.resulting_patch) else 'Empty'}\n\n")
+        
+        # Key metrics table
+        f.write("**📈 Metrics:** ")
+        f.write(f"{result.success_ratio:.1%} success ({sum(1 for a in result.actions if a.success)}/{len(result.actions)} actions) | ")
+        f.write(f"{result.total_execution_time:.1f}s | ${result.model_stats.instance_cost:.2f} | ")
+        f.write(f"{result.mcp_usage:.1%} MCP usage\n\n")
+        
+        # Action summary
+        f.write("**⚡ Action Summary:** ")
+        successful_actions = [a for a in result.actions if a.success]
+        failed_actions = [a for a in result.actions if not a.success]
+        
+        f.write(f"✅ {len(successful_actions)} successful, ❌ {len(failed_actions)} failed")
+        if result.actions:
+            f.write(f" | Avg time: {sum(a.execution_time for a in result.actions)/len(result.actions):.1f}s")
+        f.write("\n\n")
+        
+        # Truncated patch if meaningful and includes patches
+        if include_patches and self._has_meaningful_patch(result.resulting_patch):
+            f.write("**📝 Patch Preview:**\n\n")
+            # Use the format_patch method to show file-by-file previews
+            f.write(self._format_patch_for_preview(result.resulting_patch, max_lines=8))  # 8 lines per file block
+            f.write("\n")
+        
+        # Reference to detailed split file if split mode
+        if simplified_for_split:
+            safe_id = "".join(c for c in result.trajectory_id if c.isalnum() or c in "._-")
+            f.write(f"\n**📄 Detailed Analysis:** See `{safe_id}.md`\n")
+        
+        f.write("\n")
+    
+    def _create_task_hash(self, normalized_task: str) -> str:
+        """Create a short hash identifier for a task"""
+        if not normalized_task:
+            return "unknown"
+        # Create MD5 hash and take first 6 characters for readability
+        hash_object = hashlib.md5(normalized_task.encode())
+        return hash_object.hexdigest()[:6]
+    
+    def _format_patch_for_preview(self, patch: str, max_lines: int = 8) -> str:
+        """Format patch for preview with per-file truncation"""
+        if not patch or patch.strip() in ["No patch found", "No patch", "no patch"]:
+            return "*No meaningful patch generated*"
+
+        # Split patch into blocks at each "diff --git" boundary
+        lines = patch.split('\n')
+        blocks: list[list[str]] = []
+        current_block: list[str] = []
+
+        for line in lines:
+            if line.startswith('diff --git') and current_block:
+                blocks.append(current_block)
+                current_block = [line]
+            else:
+                current_block.append(line)
+
+        if current_block:
+            blocks.append(current_block)
+
+        # Truncate each block independently
+        any_truncated = False
+        result_lines: list[str] = []
+
+        for block in blocks:
+            if len(block) > max_lines:
+                result_lines.extend(block[:max_lines])
+                result_lines.append(f'# ... [block truncated – showing first {max_lines} lines]')
+                any_truncated = True
+            else:
+                result_lines.extend(block)
+
+        result_patch = '\n'.join(result_lines)
+        suffix = (
+            "\n\n*[One or more diff blocks truncated"
+            f" – showing first {max_lines} lines per block]*"
+            if any_truncated else ""
+        )
+        return f"```diff\n{result_patch}\n```{suffix}"
+    
+    def _write_overall_mcp_analysis(self, f, grouped):
+        """Write overall analysis of MCP impact across all tasks"""
+        total_tasks = len(grouped)
+        tasks_with_mcp_comparison = sum(1 for task_results in grouped.values() 
+                                      if task_results["with_mcp"] and task_results["without_mcp"])
+        
+        f.write(f"- **Tasks analyzed:** {total_tasks}\n")
+        f.write(f"- **Tasks with MCP comparison data:** {tasks_with_mcp_comparison}\n\n")
+        
+        if tasks_with_mcp_comparison > 0:
+            f.write("### Cross-Task MCP Impact Patterns\n\n")
+            
+            # Analyze patterns across tasks
+            mcp_wins = 0
+            no_mcp_wins = 0
+            ties = 0
+            
+            for task_results in grouped.values():
+                if task_results["with_mcp"] and task_results["without_mcp"]:
+                    mcp_success = sum(1 for r in task_results["with_mcp"] if r.success) / len(task_results["with_mcp"])
+                    no_mcp_success = sum(1 for r in task_results["without_mcp"] if r.success) / len(task_results["without_mcp"])
+                    
+                    if mcp_success > no_mcp_success + 0.1:  # 10% threshold
+                        mcp_wins += 1
+                    elif no_mcp_success > mcp_success + 0.1:
+                        no_mcp_wins += 1
+                    else:
+                        ties += 1
+            
+            f.write(f"- **Tasks where MCP performed better:** {mcp_wins}\n")
+            f.write(f"- **Tasks where non-MCP performed better:** {no_mcp_wins}\n")
+            f.write(f"- **Tasks with similar performance:** {ties}\n\n")
+        else:
+            f.write("*No tasks have both MCP and non-MCP trajectories for comparison.*\n\n")
+    
     def print_summary(self, results: List[TrajectoryAnalysis]):
         """Print a summary of the analysis"""
         if not results:
@@ -920,7 +1375,13 @@ class TrajectoryAnalyzer:
         
         total_results = len(results)
         successful = sum(1 for r in results if r.success)
-        submitted = sum(1 for r in results if r.exit_status == 'submitted')
+        submitted = sum(1 for r in results if r.exit_status.startswith('submitted'))
+        
+        # Exit status breakdown
+        manual_submissions = sum(1 for r in results if r.exit_status_type == 'manual_submission')
+        auto_format_errors = sum(1 for r in results if r.exit_status_type == 'auto_format_errors')
+        auto_other = sum(1 for r in results if r.exit_status_type == 'auto_other')
+        
         with_patches = sum(1 for r in results if r.resulting_patch and len(r.resulting_patch.strip()) > 10)
         
         # Calculate average success ratio
@@ -930,6 +1391,7 @@ class TrajectoryAnalyzer:
         # MCP usage statistics
         with_mcp = sum(1 for r in results if r.with_mcp)
         used_mcp = sum(1 for r in results if r.mcp_usage > 0)
+        mcp_cli_mode = sum(1 for r in results if r.mcp_cli_mode)
         mcp_available_and_used = sum(1 for r in results if r.with_mcp and r.mcp_usage > 0)
         avg_mcp_usage = sum(r.mcp_usage for r in results) / total_results if total_results > 0 else 0.0
         
@@ -943,19 +1405,28 @@ class TrajectoryAnalyzer:
         
         print(f"\n=== TRAJECTORY ANALYSIS SUMMARY ===")
         print(f"Total trajectories analyzed: {total_results}")
-        print(f"Successful trajectories (submitted + ≥70% action success): {successful} ({successful/total_results*100:.1f}%)")
+        print(f"Successful trajectories (submitted + ≥70% action success, no format errors): {successful} ({successful/total_results*100:.1f}%)")
         print(f"Submitted trajectories: {submitted} ({submitted/total_results*100:.1f}%)")
+        print(f"  └─ Manual submissions: {manual_submissions} ({manual_submissions/total_results*100:.1f}%)")
+        print(f"  └─ Auto-submitted (format/syntax errors): {auto_format_errors} ({auto_format_errors/total_results*100:.1f}%)")
+        print(f"  └─ Auto-submitted (other constraints): {auto_other} ({auto_other/total_results*100:.1f}%)")
         print(f"Trajectories with patches: {with_patches} ({with_patches/total_results*100:.1f}%)")
         print(f"High-quality trajectories (≥80% action success): {high_success_ratio} ({high_success_ratio/total_results*100:.1f}%)")
         print(f"Average action success ratio: {avg_success_ratio*100:.1f}%")
         print(f"\nMCP Usage Analysis:")
         print(f"  Trajectories with MCP available: {with_mcp} ({with_mcp/total_results*100:.1f}%)")
         print(f"  Trajectories that used MCP: {used_mcp} ({used_mcp/total_results*100:.1f}%)")
+        print(f"  MCP via bash CLI wrappers: {mcp_cli_mode} ({mcp_cli_mode/total_results*100:.1f}%)")
         print(f"  MCP available and used: {mcp_available_and_used} ({mcp_available_and_used/total_results*100:.1f}%)")
         print(f"  Average MCP usage ratio: {avg_mcp_usage:.3f} ({avg_mcp_usage*100:.1f}% of actions)")
         if used_mcp > 0:
             avg_usage_among_users = sum(r.mcp_usage for r in results if r.mcp_usage > 0) / used_mcp
             print(f"  Average MCP usage among MCP users: {avg_usage_among_users:.3f} ({avg_usage_among_users*100:.1f}% of actions)")
+        
+        if mcp_cli_mode > 0 and auto_format_errors > 0:
+            cli_with_errors = sum(1 for r in results if r.mcp_cli_mode and r.exit_status_type == 'auto_format_errors')
+            if cli_with_errors > 0:
+                print(f"  MCP CLI trajectories with format errors: {cli_with_errors}/{mcp_cli_mode} ({cli_with_errors/mcp_cli_mode*100:.1f}%)")
 
         print(f"\nCost Analysis:")
         print(f"  Total cost: ${total_cost:.2f}")
@@ -966,6 +1437,15 @@ class TrajectoryAnalyzer:
         print(f"\nPerformance Analysis:")
         print(f"  Average execution time: {avg_execution_time:.2f}s")
         print(f"  Average actions per trajectory: {avg_actions:.1f}")
+        
+        # Analysis note about MCP CLI mode
+        if mcp_cli_mode > 0:
+            print(f"\n⚠️  MCP CLI Analysis Note:")
+            print(f"  {mcp_cli_mode} trajectories used MCP via bash CLI wrappers (Princeton SWE-agent setup).")
+            print(f"  This may explain higher execution times and format/syntax error rates due to:")
+            print(f"    - Bash escaping complexity")
+            print(f"    - Shell process overhead")  
+            print(f"    - Increased fragility compared to native MCP integration")
 
 
 def main():
@@ -982,6 +1462,11 @@ def main():
                        help="Include detailed action sequences in markdown output")
     parser.add_argument("--markdown-no-patches", action="store_true",
                        help="Exclude patches from markdown output for shorter documents")
+    parser.add_argument("--group-by-task", action="store_true", 
+                       default=True,
+                       help="Group trajectories by normalized task statement (default: True)")
+    parser.add_argument("--no-group-by-task", action="store_true", 
+                       help="Disable task grouping (traditional single-list output)")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--filter-submitted", action="store_true", 
                        help="Only include trajectories with exit_status='submitted'")
@@ -1024,12 +1509,16 @@ def main():
         analyzer.export_to_csv(results, Path(args.output_csv))
     
     if args.output_markdown:
+        # Handle conflicting group arguments
+        group_by_task = args.group_by_task and not args.no_group_by_task
+        
         analyzer.export_to_markdown(
             results, 
             Path(args.output_markdown),
             detailed=args.markdown_detailed,
             include_patches=not args.markdown_no_patches,
-            simplified_for_split=args.markdown_split
+            simplified_for_split=args.markdown_split,
+            group_by_task=group_by_task
         )
     
     if args.markdown_split:

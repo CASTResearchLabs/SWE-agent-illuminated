@@ -2,6 +2,8 @@
 # Optimize OpenMRS module initialization and dependency management
 target_repo: https://github.com/CASTResearchLabs/openmrs-core
 model: anthropic/claude-sonnet-4-6
+per_instance_cost_limit: 10.0
+per_instance_call_limit: 500
 config: config/adaptive_engineering.yaml
 deployment: local
 application_name: openmrs01
@@ -50,11 +52,12 @@ task: |
   4. Assess security implications of module boundary changes
   
   **DELIVERABLES (MUST CREATE FILES):**
-  - Create INITIALIZATION_COMPLEXITY_ANALYSIS.md with detailed structural breakdown
-  - Create MODULE_BOUNDARY_DESIGN.md defining proposed architectural separations
-  - Create REFACTORING_STRATEGY.md with phased implementation approach
-  - Create PERFORMANCE_OPTIMIZATION_PLAN.md targeting startup speed improvements
-  - Create MODULE_TESTING_FRAMEWORK.md for isolated and integration testing strategies
+  - Save intermediate findings in markup files in <repository directory>/ if needed
+  - Create and SAVE <repository directory>/INITIALIZATION_COMPLEXITY_ANALYSIS.md with detailed structural breakdown
+  - Create and SAVE <repository directory>/MODULE_BOUNDARY_DESIGN.md defining proposed architectural separations
+  - Create and SAVE <repository directory>/REFACTORING_STRATEGY.md with phased implementation approach
+  - Create and SAVE <repository directory>/PERFORMANCE_OPTIMIZATION_PLAN.md targeting startup speed improvements
+  - Create and SAVE <repository directory>/MODULE_TESTING_FRAMEWORK.md for isolated and integration testing strategies
   
   Focus on structural intelligence to design a refactoring that maintains functional 
   compatibility while dramatically improving modularity and maintainability.
